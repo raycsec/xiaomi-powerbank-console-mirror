@@ -32,17 +32,13 @@
 ```text
 src/worker.js                  # Worker 入口（与线上部署文件一致）
 src/index.js                   # 应用主包（React，可读版）
-src/index-dev.js               # 测试模式主包（不含设备门槛）
 src/XiaomiPowerBankPanel.js    # 设备面板：WebHID 读写、Qi2.2 控制与统计展示
 src/ModelData.js               # 型号数据表（含 Qi2.2 能力标记）
 src/ModelSupportPanel.js       # 支持型号列表页面组件
-src/qi2-trial.js               # /supportqi2 的独立 QI 2.2 尝试脚本（WebHID，原始帧日志）
-src/string-*.js                # 多语言文本分片
 src/index.css                  # 页面样式
 src/react-vendor.js            # React 运行时
 scripts/authored-worker.js     # 手工维护的 Worker 主体（构建输入）
 scripts/build_worker.mjs       # 构建脚本（产出 src/worker.js）
-assets/sponsor-qr.jpg          # 赞赏码图片
 docs/CHANGELOG.md              # 本仓库补齐的功能与变更说明
 ```
 
@@ -67,7 +63,6 @@ CREATE TABLE qi2_reports (
   action     TEXT,   -- on / off
   ok         INTEGER,
   detail     TEXT,   -- 成功时的协议名或失败原因
-  info       TEXT,   -- JSON：生产信息（电池型号/编码/厂商/日期）与失败诊断
   created_at INTEGER,
   updated_at INTEGER,
   PRIMARY KEY (model, sn_hash, action)

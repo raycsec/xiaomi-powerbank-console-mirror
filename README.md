@@ -32,17 +32,13 @@ An unofficial mirror of the Xiaomi Power Bank WebHID console, adding full **Qi2.
 ```text
 src/worker.js                  # Worker entry point (matches production deployment)
 src/index.js                   # Main React application bundle (readable)
-src/index-dev.js               # Dev-mode bundle (no device gates)
 src/XiaomiPowerBankPanel.js    # Device panel: WebHID I/O, Qi2.2 control, stats UI
 src/ModelData.js               # Model metadata table (with Qi2.2 capability flags)
 src/ModelSupportPanel.js       # Supported models list component
-src/qi2-trial.js               # Standalone Qi2.2 trial script for /supportqi2 (WebHID, raw frame log)
-src/string-*.js                # i18n chunks
 src/index.css                  # Stylesheet
 src/react-vendor.js            # React runtime
 scripts/authored-worker.js     # Hand-maintained Worker source (build input)
 scripts/build_worker.mjs       # Build script (outputs src/worker.js)
-assets/sponsor-qr.jpg          # Sponsor QR image
 docs/CHANGELOG.md              # Detailed changelog of added features
 ```
 
@@ -67,7 +63,6 @@ CREATE TABLE qi2_reports (
   action     TEXT,   -- on / off
   ok         INTEGER,
   detail     TEXT,   -- Protocol name on success, or failure reason
-  info       TEXT,   -- JSON: production info (battery model/code/manufacturer/date) + failure diagnostics
   created_at INTEGER,
   updated_at INTEGER,
   PRIMARY KEY (model, sn_hash, action)
