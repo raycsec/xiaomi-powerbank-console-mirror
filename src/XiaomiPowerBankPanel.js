@@ -23115,14 +23115,11 @@ class Kh {
           .join(""),
         r2 = this.convertHexToLittleEndian(n2),
         l2 = t2.subarray(2, 22),
-        a2 =
-          (Array.from(l2)
-            .map((e4) => e4.toString(16).toUpperCase().padStart(2, "0"))
-            .join(""),
-          Array.from(l2)
-            .filter((e4) => e4 !== 0)
-            .map((e4) => String.fromCharCode(e4))
-            .join("")),
+        a2 = Array.from(l2)
+          .filter((e4) => e4 !== 0)
+          .map((e4) => String.fromCharCode(e4))
+          .join(""),
+        snBytes = new Uint8Array(l2);
         i2 = t2[22];
       let s2 = "--";
       switch (i2) {
@@ -23146,6 +23143,7 @@ class Kh {
         deviceModelDecimal: n2,
         deviceModelInfo: c2,
         sn: a2,
+        snBytes: snBytes,
         chargingStatus: { code: i2, description: s2 },
       };
     } catch (t2) {
@@ -24143,7 +24141,8 @@ const { TabPane: Xh } = yc,
       _qi2Ccm = async (e4, t2, o2, n2, r2) => {
         const l2 = new TextEncoder(),
           a2 = new Uint8Array(12),
-          i2 = l2.encode(String(e4).slice(-8));
+          i2 = (e4 instanceof Uint8Array ? e4 : new Uint8Array(0)).slice(-8);
+        if (!i2.length) throw new Error("\u8BBE\u5907\u5E8F\u5217\u53F7\u4E3A\u7A7A");
         a2.set(i2, 8 - i2.length), new DataView(a2.buffer).setUint32(8, t2, !1);
         const s2 = await crypto.subtle.importKey(
             "raw",
@@ -24205,14 +24204,14 @@ const { TabPane: Xh } = yc,
         _setQi2On(t2);
       },
       _qi2Encrypted = async (e4, t2) => {
-        const o2 = Hh.encode("Hello", jh.CMD_HELLO),
-          n2 = new DataView(o2.buffer, o2.byteOffset).getUint32(3, !0),
+        const helloFrame = Hh.encode("Hello", jh.CMD_HELLO),
+          n2 = new DataView(helloFrame.buffer, helloFrame.byteOffset).getUint32(3, !0),
           r2 = _qi2Wait("0x10", 2500);
-        await _e2.sendCommand(e4, o2, "Hello");
+        await _e2.sendCommand(e4, helloFrame, "Hello");
         const l2 = await r2,
-          a2 = l2 && l2.sn ? l2.sn : "";
+          a2 = l2 && l2.snBytes ? l2.snBytes : new Uint8Array(0);
         _qi2Diag.current = { protocol: "encrypted", modelId: l2 ? l2.deviceModelDecimal : "", snLen: a2.length };
-        if (!/^[ -~]+$/.test(a2)) throw new Error("\u65E0\u6CD5\u83B7\u53D6\u8BBE\u5907\u5E8F\u5217\u53F7");
+        if (!a2.length) throw new Error("\u65E0\u6CD5\u83B7\u53D6\u8BBE\u5907\u5E8F\u5217\u53F7");
         const c2 = await _qi2QueryNow(e4);
         if (c2 && c2.success && c2.isEnabled === t2) return void _setQi2On(t2);
         const i2 = _qi2Wait("0x11", 3500);
@@ -24310,8 +24309,22 @@ const { TabPane: Xh } = yc,
           (_qi2Lock.current = !0), _setQi2Busy(!0);
           try {
             const t2 = _qi2FindModel(De2.current);
-            t2 && t2.qi2NewProtocol ? await _qi2Encrypted(V2, !!e4) : await _qi2Legacy(V2, !!e4);
-            _qi2Report(!!e4, true, t2 && t2.qi2NewProtocol ? "encrypted" : "legacy");
+            if (t2 && t2.qi2NewProtocol) {
+              await _qi2Encrypted(V2, !!e4);
+              _qi2Report(!!e4, true, "encrypted");
+            } else {
+              try {
+                await _qi2Legacy(V2, !!e4);
+                _qi2Report(!!e4, true, "legacy");
+              } catch (legacyErr) {
+                _qi2Diag.current = Object.assign({}, _qi2Diag.current, {
+                  legacyError: (legacyErr && legacyErr.message) || "unknown",
+                  fallback: "encrypted",
+                });
+                await _qi2Encrypted(V2, !!e4);
+                _qi2Report(!!e4, true, "encrypted-fallback");
+              }
+            }
           } catch (t2) {
             _qi2Report(!!e4, false, (t2 && t2.message) || "unknown");
             (_qi2Lock.current = !1),
