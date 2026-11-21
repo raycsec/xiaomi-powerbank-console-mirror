@@ -290,7 +290,7 @@ s = rep(
     '            \'<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:20px 24px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06);opacity:.92;">\'',
     '            + \'<div><div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:4px;">\' + (i + 1) + ". " + m[0] + "</div>"',
     '            + \'<div style="font-size:12px;color:#6b7280;">\' + m[1] + "</div>" + "</div>"',
-    '            + \'<div style="flex:0 0 auto;margin-left:16px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:999px;padding:6px 16px;font-size:13px;font-weight:600;">\' + m[2] + " · 开启方式暂不适配</div>"',
+    '            + \'<div style="flex:0 0 auto;margin-left:16px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:999px;padding:6px 16px;font-size:13px;font-weight:600;">\' + m[2] + " · 硬件支持 · 开启方式暂不适配</div>"',
     '            + "</div>"',
     "          );",
     "        })",
