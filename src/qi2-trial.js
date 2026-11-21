@@ -1,3 +1,4 @@
+const APP_VERSION = window.__MIECO_APP_VERSION || "v26";
 const HEAD = 165;
 const FRAME_SIZE = 32;
 const CMD = { HELLO: 0x00, BATT: 0x01, QI2_GET: 0x07, QI2_SET: 0x06, ENC: 0xE6, R_HELLO: 0x10, R_BATT: 0x11, R_QI2_GET: 0x17, R_QI2_SET: 0x16, R_ENC: 0xF6, ECHO: 0xFE };
@@ -285,6 +286,9 @@ async function run(target) {
           model: modelName.toUpperCase(),
           snHash,
           action: target ? "on" : "off",
+          appVersion: APP_VERSION,
+          reportedAt: new Date().toISOString(),
+          pageUrl: location.origin + location.pathname,
           ok,
           detail: ok ? "trial-" + usedPath + "-ok" : "trial-" + usedPath + "-readback-mismatch",
           info: { protocol: "trial:" + usedPath, modelDec, health, cycles, chgState, fault, writeStatus, readback: after ? after.isEnabled : "error" },

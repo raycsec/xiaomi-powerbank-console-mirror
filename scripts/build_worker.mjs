@@ -328,7 +328,7 @@ s = rep(
     "        </div>",
     '        <pre id="qt-log" style="margin: 12px 0 0; max-height: 300px; overflow: auto; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-size: 11px; color: #374151; white-space: pre-wrap; word-break: break-all;"></pre>',
     "      </div>",
-    '      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v24.js"></script>',
+    '      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v26.js"></script>',
     '      <div style="font-size: 12px; color: #9ca3af; text-align: center; margin: 24px 0;">仅供学习研究 不推荐任何非官方修改设备行为 可能造成的安全和法律风险请自行承担</div>',
     "    </div>",
     "  </body>",
@@ -503,7 +503,7 @@ s = rep(
   s = rep(
     s,
     "const successHeaders = new Headers();\n    successHeaders.set('content-type', 'text/html;charset=UTF-8');\n    const showMigrationNotice",
-    "const successHeaders = new Headers();\n    successHeaders.set('content-type', 'text/html;charset=UTF-8');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v24.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v24.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v24.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v24.css>; rel=preload; as=style; crossorigin');\n    const showMigrationNotice",
+    "const successHeaders = new Headers();\n    successHeaders.set('content-type', 'text/html;charset=UTF-8');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v26.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v26.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v26.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v26.css>; rel=preload; as=style; crossorigin');\n    const showMigrationNotice",
     "early hints links",
     1,
   );
@@ -512,25 +512,25 @@ s = rep(
 s = rep(
   s,
   '    <script type="module" crossorigin src="/eco--usb-device-web/static/assets/index-17f0f8a6.js" nonce="${scriptNonce}"></script>',
-  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v24.js").catch(function () {}); });</script>',
+  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v26.js").catch(function () {}); });</script>',
   "app bootstrap import",
   2,
 );
 s = rep(
   s,
   '    <script type="module" crossorigin src="/eco--usb-device-web/static/assets/index-dev-a2.js" nonce="${scriptNonce}"></script>',
-  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v24.js").catch(function () {}); });</script>',
+  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v26.js").catch(function () {}); });</script>',
   "dev bootstrap import",
   1,
 );
 
 for (const [from, to, n, label] of [
-    ["index-17f0f8a6.js", "index-17f0f8a6.v24.js", 2, "index refs"],
+    ["index-17f0f8a6.js", "index-17f0f8a6.v26.js", 2, "index refs"],
     ["react-vendor-252eb283.js", "react-vendor-252eb283.read.js", 3, "vendor refs"],
-    ["XiaomiPowerBankPanel-369974d1.js", "XiaomiPowerBankPanel-369974d1.v24.js", 3, "xpanel refs"],
-    ["ModelData-16716423.js", "ModelData-16716423.v24.js", 3, "modeldata refs"],
-    ["index-30406512.css", "index-30406512.v24.css", 3, "css refs"],
-    ["index-dev-a2.js", "index-dev-a2.v24.js", 1, "dev refs"],
+    ["XiaomiPowerBankPanel-369974d1.js", "XiaomiPowerBankPanel-369974d1.v26.js", 3, "xpanel refs"],
+    ["ModelData-16716423.js", "ModelData-16716423.v26.js", 3, "modeldata refs"],
+    ["index-30406512.css", "index-30406512.v26.css", 3, "css refs"],
+    ["index-dev-a2.js", "index-dev-a2.v26.js", 1, "dev refs"],
   ]) {
     s = rep(s, from, to, "readable " + label, n);
   }
@@ -552,15 +552,15 @@ for (const t of [
   "__mieco_guard_hold",
   "guardLoop",
   "rel=preload",
-  "index-17f0f8a6.v24.js",
-  "index-30406512.v24.css",
+  "index-17f0f8a6.v26.js",
+  "index-30406512.v26.css",
   "WPB1026S",
   "WPB0525S",
   "可能支持（未经测试）",
   "url.pathname === '/supportqi2'",
   "DROP TABLE",
   "navigator.plugins",
-  "import(\"/eco--usb-device-web/static/assets/index-17f0f8a6.v24.js\")",
+  "import(\"/eco--usb-device-web/static/assets/index-17f0f8a6.v26.js\")",
 ]) {
   console.log("count", t, count(s, t));
 }

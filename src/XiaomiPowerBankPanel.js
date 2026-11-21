@@ -23204,7 +23204,7 @@ class Kh {
           .map((e4) => String.fromCharCode(e4))
           .join(""),
         snBytes = new Uint8Array(l2),
-        i2 = t2[22];
+        i2 = t2.length > 23 ? t2[t2.length - 1] : t2[22];
       let s2 = "--";
       switch (i2) {
         case 0:
@@ -24091,6 +24091,7 @@ const { TabPane: Xh } = yc,
       ze2 = It.useRef(null),
       He2 = It.useRef(null),
       je2 = It.useRef(null),
+      _qi2AppVersion = "v26",
       _qi2Model = (e4) =>
         _qi2FindModel(e4) || {
           id: null,
@@ -24389,6 +24390,9 @@ const { TabPane: Xh } = yc,
                   model: String(n2.model || De2.current || "GENERIC").toUpperCase(),
                   snHash: a2,
                   action: e4 ? "on" : "off",
+                  appVersion: _qi2AppVersion,
+                  reportedAt: new Date().toISOString(),
+                  pageUrl: (function () { try { return location.origin + location.pathname; } catch (e) { return ""; } })(),
                   ok: !!t2,
                   detail: String(o2 || "").slice(0, 400),
                   devLogs: __qlog.dump(),
