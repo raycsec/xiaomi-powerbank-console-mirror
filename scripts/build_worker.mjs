@@ -313,6 +313,7 @@ s = rep(
     '    <div id="blue-banner" style="position: relative; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; box-sizing: border-box; font-family: sans-serif;">',
     '      <div>网页快照 - 抓取时间: 2026/10/15 20:00:46 | 原网址: <a href="https://powerbank.mieco.net/" target="_blank" style="color:white; text-decoration:underline;">https://powerbank.mieco.net/</a></div>',
     '      <div style="margin-top: 4px; font-weight: bold;">此快照版本修改了部分设备qi2.2开启和关闭功能的相关配置</div>',
+    "      <div style=\"color: #e2e8f0; font-size: 10px; margin-top: 4px; line-height: 1.4;\">仅供学习研究 不推荐任何非官方修改设备行为 可能造成的安全和法律风险请自行承担${repoHtml}${migrationHtml}</div>",
     '      <div style="margin-top: 8px;"><a href="/" style="display: inline-block; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.65); color: #fff; padding: 4px 16px; border-radius: 999px; font-size: 12px; text-decoration: none;">← 返回应用</a></div>',
     "    </div>",
     '    <div style="max-width: 760px; margin: 24px auto; padding: 0 16px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', \'PingFang SC\', \'Hiragino Sans GB\', \'Microsoft YaHei\', sans-serif;">',
