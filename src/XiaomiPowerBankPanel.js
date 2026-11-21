@@ -25513,14 +25513,14 @@ const { TabPane: Xh } = yc,
                       children:
                         W2 === "en"
                           ? "Qi 2.2 is not supported on this model"
-                          : "\u8BE5\u8BBE\u5907\u4E0D\u652F\u6301\u5F00\u542F QI 2.2",
+                          : "\u8BE5\u8BBE\u5907\u7684 QI 2.2 \u5F00\u542F\u65B9\u5F0F\u6682\u4E0D\u9002\u914D",
                     }),
                     kt.jsx("p", {
                       className: "text-xs text-gray-500 leading-relaxed",
                       children:
                         W2 === "en"
                           ? "Xiaomi UltraThin Magnetic Power Bank 5000 25W (WPB0525S) rejects both the encrypted and the plaintext enable command, so this page does not offer the toggle."
-                          : "\u5C0F\u7C73\u91D1\u6C99\u6C5F\u5145\u7535\u5B9D \u8D85\u8584\u78C1\u5438 5000 27W\uFF08WPB0525S\uFF09\u5BF9\u52A0\u5BC6\u4E0E\u660E\u6587\u4E24\u79CD\u5F00\u542F\u6307\u4EE4\u5747\u8FD4\u56DE\u62D2\u7EDD\uFF0C\u672C\u9875\u9762\u4E0D\u63D0\u4F9B\u5F00\u5173\u3002",
+                          : "\u6B64\u578B\u53F7\u786C\u4EF6\u5C42\u9762\u652F\u6301 QI 2.2\uFF0C\u4F46\u5F53\u524D\u5F00\u542F\u65B9\u5F0F\u5C1A\u672A\u9002\u914D\uFF1B\u5BC6\u6587\u4E0E\u660E\u6587\u4E24\u79CD\u5F00\u542F\u6307\u4EE4\u5747\u88AB\u56FA\u4EF6\u62D2\u7EDD\uFF0C\u56E0\u6B64\u672C\u9875\u9762\u4E0D\u63D0\u4F9B\u5F00\u5173\u3002",
                     }),
                   ],
                 })
