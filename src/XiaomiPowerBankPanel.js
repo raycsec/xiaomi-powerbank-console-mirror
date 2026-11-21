@@ -25380,7 +25380,7 @@ const { TabPane: Xh } = yc,
                 }),
             ],
           }),
-          Z2 && _qi2Model(De2.current)?.supportsQI2
+          Z2 && _qi2Model(De2.current)?.supportsQI2 && !_qi2Model(De2.current)?.qi2Unsupported
             ? kt.jsxs("div", {
                 className: "card p-8 flex justify-between items-center",
                 children: [
@@ -25504,7 +25504,27 @@ const { TabPane: Xh } = yc,
                     }),
                   ],
                 })
-              : Z2 && _qi2Model(De2.current)?.qi2Unknown
+              : Z2 && _qi2Model(De2.current)?.qi2Unsupported
+              ? kt.jsxs("div", {
+                  className: "card p-8",
+                  children: [
+                    kt.jsx("h2", {
+                      className: "text-base font-bold text-gray-900 mb-1",
+                      children:
+                        W2 === "en"
+                          ? "Qi 2.2 is not supported on this model"
+                          : "\u8BE5\u8BBE\u5907\u4E0D\u652F\u6301\u5F00\u542F QI 2.2",
+                    }),
+                    kt.jsx("p", {
+                      className: "text-xs text-gray-500 leading-relaxed",
+                      children:
+                        W2 === "en"
+                          ? "Xiaomi UltraThin Magnetic Power Bank 5000 25W (WPB0525S) rejects both the encrypted and the plaintext enable command, so this page does not offer the toggle."
+                          : "\u5C0F\u7C73\u91D1\u6C99\u6C5F\u5145\u7535\u5B9D \u8D85\u8584\u78C1\u5438 5000 27W\uFF08WPB0525S\uFF09\u5BF9\u52A0\u5BC6\u4E0E\u660E\u6587\u4E24\u79CD\u5F00\u542F\u6307\u4EE4\u5747\u8FD4\u56DE\u62D2\u7EDD\uFF0C\u672C\u9875\u9762\u4E0D\u63D0\u4F9B\u5F00\u5173\u3002",
+                    }),
+                  ],
+                })
+            : Z2 && _qi2Model(De2.current)?.qi2Unknown
                 ? kt.jsxs("div", {
                     className: "card p-8",
                     children: [

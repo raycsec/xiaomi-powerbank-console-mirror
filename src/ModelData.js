@@ -29,7 +29,7 @@ const n = [
       isShow: !0,
       tempRange: "-20\u2103~60\u2103",
       supportsQI2: !0,
-      qi2NewProtocol: !0,
+      qi2Unsupported: !0,
     },
     {
       id: 11,

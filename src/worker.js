@@ -104,7 +104,7 @@ export default {
       } catch (err) {}
       return new Response('Not Found', { status: 404, headers: applySecurityHeaders(new Headers()) });
     }
-    const DEV_MODE = env.MIRROR_DEV_MODE === '1';
+    if (url.searchParams.get('reject') === '1') {    const DEV_MODE = env.MIRROR_DEV_MODE === '1';
 
     if (DEV_MODE) {
       const devHeaders = new Headers();
@@ -141,11 +141,11 @@ export default {
         }catch(e){}
       })();
     </script>
-    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v26.js").catch(function () {}); });</script>
+    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v28.js").catch(function () {}); });</script>
     <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/react-vendor-252eb283.read.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v26.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v26.js" nonce="${scriptNonce}">
-    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v26.css" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v28.js" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v28.js" nonce="${scriptNonce}">
+    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v28.css" nonce="${scriptNonce}">
   </head>
   <body style="margin: 0;">
     <div id="blue-banner" style="position: fixed; top: 0px; left: 0px; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; z-index: 999999; font-family: sans-serif; box-sizing: border-box;">
@@ -199,8 +199,7 @@ export default {
       <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 28px 32px;">
         <h1 style="font-size: 20px; font-weight: 700; color: #111827; margin: 0 0 8px;">QI 2.2 支持机型（测试版）</h1>
         <p style="font-size: 14px; color: #6b7280; margin: 0 0 20px; line-height: 1.7;">以下机型支持开启 / 关闭 QI 2.2 功能（25W 无线快充）。</p>
-        <div style="font-size: 15px; color: #111827; line-height: 2;"><b>支持开启 / 关闭（当前方法）</b><br>1. 小米金沙江充电宝 超薄磁吸 10000 45W — WPB1025S<br>2. 小米金沙江充电宝 超薄磁吸 10000 45W — WPB1026S · 加密协议<br>3. 小米金沙江充电宝 超薄磁吸 5000 27W — WPB0525S · 加密协议</div>
-        <div style="margin-top: 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #1e40af; line-height: 1.8;"><b>新版开启方式：</b>WPB1026S 与 WPB0525S 使用加密设置协议，写入前会重新握手、读取电池健康度与循环次数，并在回读状态一致后才提示成功；固件差异可能导致个别设备无法开启。</div>
+        <div style="margin-top: 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #1e40af; line-height: 1.8;"><b>新版开启方式：</b>WPB1026S 使用加密设置协议，写入前会重新握手、读取电池健康度与循环次数，并在回读状态一致后才提示成功；固件差异可能导致个别设备无法开启。</div>
         <div style="margin-top: 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #4b5563; line-height: 1.8;"><b>可能支持（未经测试）：</b>小米充电宝 磁吸自带线 10000 45W — WPB1025<br>是否支持 QI 2.2 暂时无法确认；应用内提供新加密协议与「未经测试尝试开启」按钮，可自行尝试。</div>
       </div>
       <div style="text-align: center; margin-top: 16px;"><a href="/" style="color: #2563eb; text-decoration: none; font-size: 13px;">← 返回测试版应用</a></div>
@@ -210,7 +209,7 @@ export default {
         return new Response(devQi2Html, { headers: applySecurityHeaders(devHeaders, true) });
       }
     }
-    if (url.searchParams.get('reject') === '1') {
+
       return new Response("404 Not Found", { status: 404, headers: applySecurityHeaders(new Headers()) });
     }
 
@@ -784,10 +783,10 @@ export default {
 
     const successHeaders = new Headers();
     successHeaders.set('content-type', 'text/html;charset=UTF-8');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v26.js>; rel=preload; as=script; crossorigin');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v26.js>; rel=preload; as=script; crossorigin');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v26.js>; rel=preload; as=script; crossorigin');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v26.css>; rel=preload; as=style; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v28.js>; rel=preload; as=script; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v28.js>; rel=preload; as=script; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v28.js>; rel=preload; as=script; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v28.css>; rel=preload; as=style; crossorigin');
     const showMigrationNotice = url.hostname === 'mirror-mieco.nalaniflynn.cn';
     const migrationHtml = showMigrationNotice ? '<div style="margin-top: 6px;">网站即将迁移到 <a href="https://mirror-mieco.raycsec.com/" style="color:#fff;text-decoration:underline;">https://mirror-mieco.raycsec.com/</a></div>' : '';
     const repoHtml = '<div style="margin-top: 6px;">开源地址：<a href="https://github.com/raycsec/xiaomi-powerbank-console-mirror" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;">github.com/raycsec/xiaomi-powerbank-console-mirror</a></div>';
@@ -841,11 +840,11 @@ export default {
     </script>
     <style nonce="${scriptNonce}">:root { --banner-height: 0px; } body { padding-top: var(--banner-height) !important; } .fixed-header { top: var(--banner-height) !important; }</style>
     ${scriptTagMain}
-    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v26.js").catch(function () {}); });</script>
+    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v28.js").catch(function () {}); });</script>
     <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/react-vendor-252eb283.read.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v26.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v26.js" nonce="${scriptNonce}">
-    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v26.css" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v28.js" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v28.js" nonce="${scriptNonce}">
+    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v28.css" nonce="${scriptNonce}">
   </head>
   <body style="margin: 0;">
     <div id="blue-banner" style="position: fixed; top: 0px; left: 0px; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; z-index: 999999; font-family: sans-serif; box-sizing: border-box;">
@@ -915,7 +914,6 @@ export default {
       const qi2Supported = [
         ["小米金沙江充电宝 超薄磁吸 10000 45W", "Xiaomi UltraThin Magnetic Power Bank 10000 25W", "WPB1025S", "WPB1025S"],
         ["小米金沙江充电宝 超薄磁吸 10000 45W", "Xiaomi UltraThin Magnetic Power Bank 10000 25W", "WPB1026S · 加密协议", "WPB1026S"],
-        ["小米金沙江充电宝 超薄磁吸 5000 27W", "Xiaomi UltraThin Magnetic Power Bank 5000 25W", "WPB0525S · 加密协议", "WPB0525S"],
       ];
       const qi2UnknownModels = [
         ["小米充电宝 磁吸自带线 10000 45W", "Xiaomi Magnetic Power Bank 10000 25W (Integrated Cable) 2027", "WPB1025", "WPB1025"],
@@ -938,6 +936,20 @@ export default {
             + '<div><div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:4px;">' + (i + 1) + ". " + m[0] + "</div>"
             + '<div style="font-size:12px;color:#6b7280;">' + m[1] + "</div>" + qi2StatsBadge(m[3] || String(m[2]).split(" \u00b7 ")[0]) + "</div>"
             + '<div style="flex:0 0 auto;margin-left:16px;background:#f3f4f6;color:#4b5563;border:1px solid #d1d5db;border-radius:999px;padding:6px 16px;font-size:13px;font-weight:600;">' + m[2] + " · 未经测试</div>"
+            + "</div>"
+          );
+        })
+        .join("");
+      const qi2UnsupportedModels = [
+        ["小米金沙江充电宝 超薄磁吸 5000 27W", "Xiaomi UltraThin Magnetic Power Bank 5000 25W", "WPB0525S"],
+      ];
+      const qi2UnsupportedHtml = qi2UnsupportedModels
+        .map(function (m, i) {
+          return (
+            '<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:20px 24px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06);opacity:.92;">'
+            + '<div><div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:4px;">' + (i + 1) + ". " + m[0] + "</div>"
+            + '<div style="font-size:12px;color:#6b7280;">' + m[1] + "</div>" + qi2StatsBadge(m[3] || String(m[2]).split(" \u00b7 ")[0]) + "</div>"
+            + '<div style="flex:0 0 auto;margin-left:16px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:999px;padding:6px 16px;font-size:13px;font-weight:600;">' + m[2] + " · 不支持</div>"
             + "</div>"
           );
         })
@@ -1001,16 +1013,18 @@ export default {
       <div style="font-size: 14px; font-weight: 700; color: #111827; margin: 8px 4px 10px;">支持开启 / 关闭（当前方法）</div>
       ${qi2ListHtml}
       <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 16px; padding: 16px 20px; margin: 20px 0 12px; font-size: 13px; color: #1e40af; line-height: 1.7;">
-        <b>新版开启方式：</b>WPB1026S 与 WPB0525S 使用加密设置协议，写入前会重新握手、读取电池健康度与循环次数，并在回读状态一致后才提示成功；固件差异可能导致个别设备无法开启。
+        <b>新版开启方式：</b>WPB1026S 使用加密设置协议，写入前会重新握手、读取电池健康度与循环次数，并在回读状态一致后才提示成功；固件差异可能导致个别设备无法开启。
       </div>
       <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px 20px; margin: 20px 0 12px; font-size: 13px; color: #4b5563; line-height: 1.7;">
         <b>可能支持（未经该型号实机测试）：</b>小米充电宝 磁吸自带线 10000 45W（WPB1025）是否支持 QI 2.2 无法确认；应用内提供「未经测试尝试开启」按钮与新加密协议，仅建议了解风险后自行尝试，失败不代表设备损坏。
       </div>
       <div style="font-size: 14px; font-weight: 700; color: #111827; margin: 8px 4px 10px;">可能支持（未经测试）</div>
       ${qi2UnknownHtml}
+      <div style="font-size: 14px; font-weight: 700; color: #111827; margin: 8px 4px 10px;">不支持</div>
+      ${qi2UnsupportedHtml}
       <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px 24px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
         <div style="font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 6px;">尝试开启（测试）</div>
-        <p style="font-size: 13px; color: #6b7280; margin: 0 0 6px; line-height: 1.7;">不识别型号，只要设备已连接即可尝试。过程中会记录发送与接收的原始数据帧，可下载用于诊断。</p>
+        <b>新版开启方式：</b>WPB1026S 使用加密设置协议，写入前会重新握手、读取电池健康度与循环次数，并在回读状态一致后才提示成功；固件差异可能导致个别设备无法开启。
         <p style="font-size: 12px; color: #b45309; margin: 0 0 12px; line-height: 1.7;">仅用于未知型号的测试入口，可能对设备无效；请勿反复尝试。</p>
         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
           <button id="qt-run" style="background: #f59e0b; color: #fff; border: 0; border-radius: 16px; padding: 8px 22px; font-size: 13px; font-weight: 600; cursor: pointer;">尝试开启</button>
@@ -1019,7 +1033,7 @@ export default {
         </div>
         <pre id="qt-log" style="margin: 12px 0 0; max-height: 300px; overflow: auto; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-size: 11px; color: #374151; white-space: pre-wrap; word-break: break-all;"></pre>
       </div>
-      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v26.js"></script>
+      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v28.js"></script>
       <div style="font-size: 12px; color: #9ca3af; text-align: center; margin: 24px 0;">仅供学习研究 不推荐任何非官方修改设备行为 可能造成的安全和法律风险请自行承担</div>
     </div>
   </body>
@@ -1077,11 +1091,11 @@ export default {
     </script>
     <style nonce="${scriptNonce}">:root { --banner-height: 0px; } body { padding-top: var(--banner-height) !important; } .fixed-header { top: var(--banner-height) !important; }</style>
     ${scriptTagMain}
-    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v26.js").catch(function () {}); });</script>
+    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v28.js").catch(function () {}); });</script>
     <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/react-vendor-252eb283.read.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v26.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v26.js" nonce="${scriptNonce}">
-    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v26.css" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v28.js" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v28.js" nonce="${scriptNonce}">
+    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v28.css" nonce="${scriptNonce}">
   </head>
   <body style="margin: 0;">
     <div id="blue-banner" style="position: fixed; top: 0px; left: 0px; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; z-index: 999999; font-family: sans-serif; box-sizing: border-box;">
