@@ -25512,14 +25512,14 @@ const { TabPane: Xh } = yc,
                       className: "text-base font-bold text-gray-900 mb-1",
                       children:
                         W2 === "en"
-                          ? "Qi 2.2 is not supported on this model"
+                          ? "Qi 2.2 is supported by this hardware, but the current enable method is not compatible yet"
                           : "\u8BE5\u8BBE\u5907\u7684 QI 2.2 \u5F00\u542F\u65B9\u5F0F\u6682\u4E0D\u9002\u914D",
                     }),
                     kt.jsx("p", {
                       className: "text-xs text-gray-500 leading-relaxed",
                       children:
                         W2 === "en"
-                          ? "Xiaomi UltraThin Magnetic Power Bank 5000 25W (WPB0525S) rejects both the encrypted and the plaintext enable command, so this page does not offer the toggle."
+                          ? "The WPB0525S hardware supports Qi 2.2, but the current enable method has not been adapted: the firmware rejects both the encrypted and the plaintext enable command, so this page does not offer the toggle."
                           : "\u6B64\u578B\u53F7\u786C\u4EF6\u5C42\u9762\u652F\u6301 QI 2.2\uFF0C\u4F46\u5F53\u524D\u5F00\u542F\u65B9\u5F0F\u5C1A\u672A\u9002\u914D\uFF1B\u5BC6\u6587\u4E0E\u660E\u6587\u4E24\u79CD\u5F00\u542F\u6307\u4EE4\u5747\u88AB\u56FA\u4EF6\u62D2\u7EDD\uFF0C\u56E0\u6B64\u672C\u9875\u9762\u4E0D\u63D0\u4F9B\u5F00\u5173\u3002",
                     }),
                   ],
