@@ -23071,6 +23071,13 @@ class Kh {
   translateToUserView(e3, t2 = {}) {
     if (e3.error) return { message: e3.error };
     switch (e3.command) {
+      case "0xFE":
+        return {
+          title: "\u8BBE\u5907\u56DE\u663E",
+          echo: !0,
+          error: "\u8BBE\u5907\u4EE5\u56DE\u663E\u65B9\u5F0F\u5E94\u7B54\uFF080xFE\uFF09\uFF0C\u672A\u8FD4\u56DE\u8BBE\u5907\u4FE1\u606F",
+          rawData: (e3.payloadHex || []).join(" "),
+        };
       case `0x${jh.CMD_HELLO.toString(16).padStart(2, "0")}`:
         return this.decodeHelloResponse(e3);
       case `0x${jh.CMD_BATTERY_RESPONSE.toString(16).padStart(2, "0")}`:
@@ -24072,7 +24079,6 @@ const { TabPane: Xh } = yc,
       [Be2, Re2] = Nt.useState(!0),
       [_qi2On, _setQi2On] = Nt.useState(!1),
       [_qi2Busy, _setQi2Busy] = Nt.useState(!1),
-      [_qi2Stats, _setQi2Stats] = Nt.useState(null),
       _qi2Diag = It.useRef({}),
       _qi2Waiter = It.useRef(null),
       Te2 = It.useRef(null),
@@ -24343,39 +24349,6 @@ const { TabPane: Xh } = yc,
           throw new Error("\u56DE\u8BFB\u72B6\u6001\u4E0E\u76EE\u6807\u4E0D\u4E00\u81F4");
         _setQi2On(t2);
       },
-      _qi2StatsFetch = () => {
-        try {
-          const e4 = _qi2Model(De2.current);
-          if (!e4) return;
-          fetch("/api/qi2-stats?model=" + encodeURIComponent(e4.model), { credentials: "same-origin" })
-            .then((t2) => (t2.ok ? t2.json() : null))
-            .then((t2) => {
-              t2 && t2.ok && _setQi2Stats(t2);
-            })
-            .catch(() => {});
-        } catch (e4) {}
-      },
-      _qi2StatsLabel = () => {
-        const e4 = _qi2Stats;
-        if (!e4) return { color: "#6b7280", text: W2 === "en" ? "Collecting..." : "\u7EDF\u8BA1\u4E2D" };
-        if (!e4.total || e4.total < 5)
-          return { color: "#6b7280", text: W2 === "en" ? "Collecting..." : "\u7EDF\u8BA1\u4E2D" };
-        const t2 = Math.round((e4.successRate || 0) * 100),
-          o2 = (e4.errorRate || 0) > 0.3,
-          n2 = (e4.errorRate || 0) < 0.1;
-        return {
-          color: o2 ? "#b45309" : n2 ? "#15803D" : "#4B5563",
-          text:
-            (W2 === "en" ? "Success rate " : "\u5F00\u542F\u6210\u529F\u7387 ") +
-            t2 +
-            "% (" +
-            (e4.total - e4.errors) +
-            "/" +
-            e4.total +
-            ")" +
-            (n2 ? " \u2713" : ""),
-        };
-      },
       _qi2Report = (e4, t2, o2) => {
         try {
           console.log("[QI2] report action=" + (e4 ? "on" : "off") + " ok=" + !!t2 + " detail=" + o2);
@@ -24415,7 +24388,6 @@ const { TabPane: Xh } = yc,
             )
             .catch(() => {});
         } catch (e5) {}
-        setTimeout(() => _qi2StatsFetch(), 800);
       },
       _qi2Trial = async () => {
         if (!V2 || _qi2Lock.current) return;
@@ -24500,9 +24472,6 @@ const { TabPane: Xh } = yc,
       Nt.useEffect(() => {
         const e4 = ce2["0x10"]?.data?.deviceModelInfo?.model;
         Z2 && _qi2Model(e4)?.supportsQI2 && _qi2Fetch();
-      }, [Z2, ce2["0x10"]?.data?.deviceModelInfo?.model]),
-      Nt.useEffect(() => {
-        Z2 && _qi2Model(De2.current)?.supportsQI2 && _qi2StatsFetch();
       }, [Z2, ce2["0x10"]?.data?.deviceModelInfo?.model]),
       Nt.useEffect(() => {
         if (!Z2) return;
@@ -24786,6 +24755,8 @@ const { TabPane: Xh } = yc,
             m3.deviceModelInfo &&
             m3.deviceModelInfo.model &&
             (De2.current = m3.deviceModelInfo.model),
+          d3.command === "0xFE" && ze2.current &&
+            (ze2.current.reject(new Error("\u8BBE\u5907\u4EE5\u56DE\u663E\u65B9\u5F0F\u5E94\u7B54\uFF080xFE\uFF09\uFF0C\u672A\u8FD4\u56DE\u8BBE\u5907\u4FE1\u606F")), (ze2.current = null)),
           ze2.current && ze2.current.resolve(m3)),
           d3.command &&
             m3 &&
@@ -25416,8 +25387,7 @@ const { TabPane: Xh } = yc,
                             ? "25W wireless charging is supported after enabling."
                             : "开启后，将支持25W无线快充",
                       }),
-                      _qi2Model(De2.current)?.qi2Unknown ||
-                      _qi2Model(De2.current)?.qi2Pending
+                      _qi2Model(De2.current)?.qi2Unknown
                         ? kt.jsx("p", {
                             className: "text-xs text-amber-600 mt-1",
                             children:
@@ -25426,16 +25396,7 @@ const { TabPane: Xh } = yc,
                                 : "\u53EF\u80FD\u652F\u6301 QI 2.2\uFF0C\u672A\u7ECF\u8BE5\u578B\u53F7\u5B9E\u673A\u6D4B\u8BD5\uFF0C\u56FA\u4EF6\u5DEE\u5F02\u53EF\u80FD\u5BFC\u81F4\u65E0\u6CD5\u5F00\u542F\u3002",
                           })
                         : null,
-                      (() => {
-                        const e4 = _qi2StatsLabel();
-                        return e4
-                          ? kt.jsx("p", {
-                              className: "text-xs mt-1",
-                              style: { color: e4.color },
-                              children: e4.text,
-                            })
-                          : null;
-                      })(),
+
                     ],
                   }),
                   kt.jsx("div", {

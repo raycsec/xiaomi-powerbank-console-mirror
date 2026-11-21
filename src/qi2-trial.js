@@ -1,43 +1,31 @@
 const HEAD = 165;
 const FRAME_SIZE = 32;
-const CMD = { HELLO: 0x10, BATT: 0x01, QI2_GET: 0x07, QI2_SET: 0x06, ENC: 0xE6, R_HELLO: 0x10, R_BATT: 0x11, R_QI2_GET: 0x17, R_ENC: 0xF6 };
-const MODEL_NAMES = {
-  9: "WPB1025S",
-  16: "WPB1026S",
-  10: "WPB0525S",
-  11: "WPB1007ZX",
-  12: "WPB1025",
-};
+const CMD = { HELLO: 0x10, BATT: 0x01, QI2_GET: 0x07, QI2_SET: 0x06, ENC: 0xE6, R_HELLO: 0x10, R_BATT: 0x11, R_QI2_GET: 0x17, R_QI2_SET: 0x16, R_ENC: 0xF6, ECHO: 0xFE };
+const MODEL_NAMES = { 9: "WPB1025S", 16: "WPB1026S", 10: "WPB0525S", 11: "WPB1007ZX", 12: "WPB1025", 19: "WPB1025S" };
 
 const logEl = document.getElementById("qt-log");
 const statusEl = document.getElementById("qt-status");
-const btn = document.getElementById("qt-run");
 const entries = [];
-let enabled = true;
+let busy = false;
 
 function hex(bytes) {
-  return Array.from(bytes)
+  return Array.from(bytes || [])
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("")
     .toUpperCase();
 }
 
 function push(kind, label, bytes, extra) {
-  if (!enabled) return;
-  const row = {
-    t: new Date().toISOString(),
-    kind,
-    label,
-    hex: bytes ? hex(bytes) : "",
-    extra: extra || null,
-  };
+  const row = { t: new Date().toISOString(), kind, label, hex: bytes ? hex(bytes) : "", extra: extra || null };
   entries.push(row);
   if (entries.length > 300) entries.splice(0, entries.length - 300);
   if (logEl) {
-    const extraText = row.extra ? " " + JSON.stringify(row.extra) : "";
-    logEl.textContent += "#" + entries.length + " " + row.t + " " + row.kind + " " + row.label + extraText + "\n  " + row.hex + "\n";
+    logEl.textContent += "#" + entries.length + " " + row.t + " " + kind + " " + label + (row.extra ? " " + JSON.stringify(row.extra) : "") + "\n  " + row.hex + "\n";
     logEl.scrollTop = logEl.scrollHeight;
   }
+  try {
+    console.log("[QI2-TRIAL] " + kind + " " + label + (row.extra ? " " + JSON.stringify(row.extra) : "") + "\n" + row.hex);
+  } catch (e) {}
 }
 
 function setStatus(text, color) {
@@ -50,9 +38,7 @@ function crc8(bytes) {
   let c = 0;
   for (const b of bytes) {
     c ^= b;
-    for (let i = 0; i < 8; i++) {
-      c = c & 0x80 ? ((c << 1) ^ 0x07) & 0xff : (c << 1) & 0xff;
-    }
+    for (let i = 0; i < 8; i++) c = c & 0x80 ? ((c << 1) ^ 0x07) & 0xff : (c << 1) & 0xff;
   }
   return c;
 }
@@ -74,7 +60,7 @@ function buildHello() {
   frame[3] = ts & 0xff;
   frame[4] = (ts >> 8) & 0xff;
   frame[5] = (ts >> 16) & 0xff;
-  frame[6] = (ts >> 24) & 0xff;
+  frame[6] = (ts >>> 24) & 0xff;
   frame.set(new TextEncoder().encode("xiaomi-pb"), 7);
   frame[16] = crc8(frame.subarray(0, 16));
   return frame;
@@ -91,15 +77,13 @@ function parseFrame(bytes) {
   const len = bytes[2];
   if (bytes.length < len + 4) return { error: "length mismatch", len };
   const payload = bytes.subarray(3, 3 + len);
-  const crc = bytes[3 + len];
-  const calc = crc8(bytes.subarray(0, 3 + len));
   return {
     command: "0x" + bytes[1].toString(16).padStart(2, "0").toUpperCase(),
     commandId: bytes[1],
     payload,
     payloadHex: Array.from(payload).map((b) => b.toString(16).padStart(2, "0").toUpperCase()),
-    crc,
-    crcOk: crc === calc,
+    crc: bytes[3 + len],
+    crcOk: bytes[3 + len] === crc8(bytes.subarray(0, 3 + len)),
   };
 }
 
@@ -140,23 +124,20 @@ async function ccm(snBytes, timestamp, health, cycles, target) {
   return tag;
 }
 
-function sha16(bytes) {
-  return crypto.subtle.digest("SHA-256", bytes).then((buf) =>
-    Array.from(new Uint8Array(buf))
-      .slice(0, 16)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join(""),
-  );
+async function sha16(bytes) {
+  const buf = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(buf)).slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function run() {
-  const device = (await navigator.hid.requestDevice({ filters: [{ vendorId: 10007 }, { vendorId: 6790 }] }))[0];
-  if (!device) {
+async function run(target) {
+  const picked = (await navigator.hid.requestDevice({ filters: [{ vendorId: 10007 }, { vendorId: 6790 }] }))[0];
+  if (!picked) {
     setStatus("未选择设备", "#b45309");
     return;
   }
-  await device.open();
-  push("INFO", "device", null, { productName: device.productName, vendorId: device.vendorId, productId: device.productId });
+  setStatus("正在握手…", "#2563eb");
+  await picked.open();
+  push("INFO", "device", null, { productName: picked.productName, vendorId: picked.vendorId, productId: picked.productId, target });
   const waiters = [];
   const onReport = (event) => {
     const bytes = new Uint8Array(event.data.buffer);
@@ -176,109 +157,163 @@ async function run() {
       return;
     }
   };
-  device.addEventListener("inputreport", onReport);
+  picked.addEventListener("inputreport", onReport);
   const send = async (frame, label) => {
     push("TX", label, frame, { length: frame.length });
-    await device.sendReport(0, padFrame(frame));
+    await picked.sendReport(0, padFrame(frame));
   };
   const wait = (command, ms) =>
-    new Promise((resolve, reject) => {
+    new Promise((resolve) => {
       const timer = setTimeout(() => {
         const index = waiters.findIndex((w) => w.timer === timer);
         if (index >= 0) waiters.splice(index, 1);
-        reject(new Error("等待响应超时 " + command));
+        resolve(null);
       }, ms || 4000);
-      waiters.push({ command, resolve, reject, timer });
+      waiters.push({ command, resolve, timer });
     });
 
+  let modelName = "GENERIC";
   try {
-    setStatus("正在握手…", "#2563eb");
     const helloFrame = buildHello();
-    const helloWait = wait(CMD.HELLO, 2500);
+    const helloWait = wait(CMD.R_HELLO, 2500);
     await send(helloFrame, "Hello");
     const hello = await helloWait;
-    const helloPayload = hello.payload;
-    const modelDec = helloPayload[0] | (helloPayload[1] << 8);
-    const snBytes = new Uint8Array(helloPayload.subarray(2, 22));
-    const modelName = MODEL_NAMES[modelDec] || "ID_" + modelDec;
-    push("INFO", "hello", null, { modelDec, modelName, snLen: snBytes.length, snHex: hex(snBytes) });
-
     const ts = new DataView(helloFrame.buffer).getUint32(3, true);
     push("INFO", "timestamp", null, { ts, tsHex: ts.toString(16) });
+    let snBytes = new Uint8Array(0);
+    let modelDec = -1;
+    if (hello && hello.commandId === CMD.R_HELLO) {
+      const p = hello.payload;
+      modelDec = p[0] | (p[1] << 8);
+      snBytes = new Uint8Array(p.subarray(2, 22));
+      modelName = MODEL_NAMES[modelDec] || "ID_" + modelDec;
+      push("INFO", "hello", null, { modelDec, modelName, snLen: snBytes.length, snHex: hex(snBytes) });
+    } else if (hello && hello.commandId === CMD.ECHO) {
+      modelName = "ECHO_" + (picked.productId || 0).toString(16).toUpperCase();
+      push("INFO", "hello", null, { echo: true, note: "设备以回显方式应答，无法读取型号与序列号，将只尝试明文路径" });
+    } else {
+      modelName = "ECHO_" + (picked.productId || 0).toString(16).toUpperCase();
+      push("WARN", "hello", null, { note: "未收到 Hello 响应，继续尝试读取状态与明文路径" });
+    }
 
     const statusWait = wait(CMD.R_QI2_GET, 3000);
     await send(buildFrame(CMD.QI2_GET, []), "查询 QI2 状态");
     const status = await statusWait;
+    if (!status) throw new Error("查询 QI2.2 状态无响应");
     const before = { statusCode: status.payload[0], isEnabled: status.payload[1] === 1 };
-    push("INFO", "状态查询", null, before);
+    push("INFO", "当前状态", null, before);
     if (before.statusCode !== 0) throw new Error("状态查询返回非 0：" + before.statusCode);
+    if (before.isEnabled === target) {
+      const msg = target ? "已经是开启状态，无需写入" : "已经是关闭状态，无需写入";
+      push("INFO", "result", null, { ok: true, skipped: true, message: msg });
+      setStatus(msg, "#15803D");
+      return;
+    }
 
-    const battWait = wait(CMD.R_BATT, 3500);
-    await send(buildFrame(CMD.BATT, []), "读取电池信息");
-    const batt = await battWait;
-    const bp = batt.payload;
-    const health = (bp[5] << 8) | bp[4];
-    const cycles = (bp[3] << 8) | bp[2];
-    const fault = bp[6] & 63;
-    const chgState = (bp[6] >> 6) & 3;
-    push("INFO", "电池信息", null, { health, cycles, chgState, fault, faultRaw: bp[6], level: bp[11] });
-    if (fault !== 0) throw new Error("设备当前存在故障（代码 " + fault + "），已停止写入");
+    let writeStatus = -1;
+    let usedPath = "";
+    let fault = 0;
+    let chgState = 0;
+    let health = 0;
+    let cycles = 0;
 
-    const tag = await ccm(snBytes, ts, health, cycles, true);
-    const writeWait = wait(CMD.R_ENC, 6000);
-    await send(buildFrame(CMD.ENC, Array.from(tag)), "设置 QI2（加密）");
-    const writeRes = await writeWait;
-    const writeOk = writeRes.payload[0] === 0;
-    push("INFO", "写入结果", null, { status: writeRes.payload[0], ok: writeOk });
+    if (snBytes.length) {
+      const battWait = wait(CMD.R_BATT, 3500);
+      await send(buildFrame(CMD.BATT, []), "读取电池信息");
+      const batt = await battWait;
+      if (batt && batt.payload.length >= 18) {
+        const bp = batt.payload;
+        health = (bp[5] << 8) | bp[4];
+        cycles = (bp[3] << 8) | bp[2];
+        fault = bp[6] & 63;
+        chgState = (bp[6] >> 6) & 3;
+        push("INFO", "电池信息", null, { health, cycles, chgState, fault, faultRaw: bp[6], level: bp[11] });
+      } else {
+        push("WARN", "电池信息", null, { note: "电池信息无响应或长度不足，跳过加密路径" });
+      }
+      if (batt && batt.payload.length >= 18 && (fault === 0 || !target)) {
+        try {
+          const tag = await ccm(snBytes, ts, health, cycles, target);
+          const encWait = wait(CMD.R_ENC, 6000);
+          await send(buildFrame(CMD.ENC, Array.from(tag)), "设置 QI2（加密）");
+          const enc = await encWait;
+          writeStatus = enc ? enc.payload[0] : -1;
+          usedPath = "encrypted";
+          push("INFO", "加密写入结果", null, { status: writeStatus, ok: writeStatus === 0 });
+          if (!enc || writeStatus !== 0) usedPath = "";
+        } catch (err) {
+          push("WARN", "加密路径失败", null, { message: String((err && err.message) || err) });
+          usedPath = "";
+        }
+      }
+    }
+
+    if (!usedPath) {
+      const legacyWait = wait(CMD.R_QI2_SET, 5000);
+      await send(buildFrame(CMD.QI2_SET, [target ? 1 : 0]), target ? "设置 QI2（明文 开启）" : "设置 QI2（明文 关闭）");
+      const legacy = await legacyWait;
+      writeStatus = legacy ? legacy.payload[0] : -1;
+      usedPath = legacy ? "legacy" : "";
+      push("INFO", "明文写入结果", null, { status: writeStatus, ok: writeStatus === 0, responded: !!legacy });
+    }
 
     const readWait = wait(CMD.R_QI2_GET, 3000);
     await send(buildFrame(CMD.QI2_GET, []), "回读 QI2 状态");
     const after = await readWait;
-    const afterState = { statusCode: after.payload[0], isEnabled: after.payload[1] === 1 };
-    push("INFO", "回读状态", null, afterState);
-    const ok = writeOk && afterState.statusCode === 0 && afterState.isEnabled === true;
+    const afterState = after ? { statusCode: after.payload[0], isEnabled: after.payload[1] === 1 } : null;
+    push("INFO", "回读状态", null, afterState || { note: "无响应" });
+    const ok = !!afterState && afterState.statusCode === 0 && afterState.isEnabled === target;
 
-    const snHash = await sha16(snBytes);
-    fetch("/api/qi2-report", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({
-        model: modelName.toUpperCase(),
-        snHash,
-        action: "on",
-        ok,
-        detail: ok ? "trial-success" : "trial-readback-mismatch",
-        info: { protocol: "encrypted-trial", modelDec, health, cycles, chgState, fault, writeStatus: writeRes.payload[0], readback: afterState.isEnabled },
-        devLogs: entries,
-      }),
-    }).catch(() => {});
+    try {
+      const snHash = await sha16(snBytes.length ? snBytes : new TextEncoder().encode(modelName));
+      await fetch("/api/qi2-report", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          model: modelName.toUpperCase(),
+          snHash,
+          action: target ? "on" : "off",
+          ok,
+          detail: ok ? "trial-" + (usedPath || "none") + "-ok" : "trial-readback-mismatch",
+          info: { protocol: "trial:" + (usedPath || "none"), modelDec, health, cycles, chgState, fault, writeStatus, readback: afterState ? afterState.isEnabled : "error" },
+          devLogs: entries,
+        }),
+      });
+    } catch (e) {}
 
-    setStatus(ok ? "尝试成功：已开启 QI 2.2" : "尝试完成但回读不一致", ok ? "#15803D" : "#b45309");
+    setStatus(ok ? (target ? "尝试成功：已开启 QI 2.2" : "尝试成功：已关闭 QI 2.2") : "尝试完成但回读不一致", ok ? "#15803D" : "#b45309");
   } catch (err) {
     push("ERROR", "exception", null, { message: String((err && err.message) || err) });
     setStatus("尝试失败：" + String((err && err.message) || err), "#dc2626");
   } finally {
-    device.removeEventListener("inputreport", onReport);
+    picked.removeEventListener("inputreport", onReport);
     try {
-      await device.close();
+      await picked.close();
     } catch (e) {}
   }
 }
 
-if (btn) {
+function bindButton(id, target) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
   btn.addEventListener("click", async (event) => {
     if (event && (!event.isTrusted || event.clientX === 0 || event.clientY === 0)) return;
-    if (btn.disabled) return;
+    if (busy) return;
+    busy = true;
     btn.disabled = true;
-    const original = btn.textContent;
-    btn.textContent = "正在尝试…";
+    const label = btn.textContent;
+    btn.textContent = target ? "正在尝试开启…" : "正在尝试关闭…";
     try {
-      await run();
+      await run(target);
     } catch (err) {
       setStatus("尝试失败：" + String((err && err.message) || err), "#dc2626");
     }
+    busy = false;
     btn.disabled = false;
-    btn.textContent = original;
+    btn.textContent = label;
   });
 }
+
+bindButton("qt-run", true);
+bindButton("qt-off", false);
