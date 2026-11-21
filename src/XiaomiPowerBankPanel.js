@@ -22732,7 +22732,7 @@ const Dh = Oh,
       };
     }
     static decodeBatteryPayload(e3) {
-      if (e3.length < 16)
+      if (e3.length < 18)
         return {
           error: "\u7535\u6C60\u6570\u636E\u957F\u5EA6\u4E0D\u8DB3",
           rawData: Array.from(e3),
@@ -23304,7 +23304,7 @@ class Kh {
         batteryLevel: v2,
         batteryTemperature: y2,
         batteryVoltage: (e3[15] << 8) | e3[14],
-        batteryCurrent: (e3[17] << 8) | e3[16],
+        batteryCurrent: ((e3[17] << 8) | e3[16]) > 32767 ? ((e3[17] << 8) | e3[16]) - 65536 : (e3[17] << 8) | e3[16],
       }
     );
   }
@@ -24192,6 +24192,12 @@ const { TabPane: Xh } = yc,
         }
       },
       Xe2 = async (e4 = V2) => {
+        if (_qi2Lock.current) {
+          try {
+            console.log("[QI2] heartbeat skipped (qi2 transaction busy)");
+          } catch (err) {}
+          return;
+        }
         try {
           await _e2.sendHelloCommand(e4 || V2);
         } catch (t3) {
@@ -24320,9 +24326,11 @@ const { TabPane: Xh } = yc,
         const s2 = await i2;
         if (!s2 || s2.error || !s2.status || s2.status.code !== 0)
           throw new Error("\u8BFB\u53D6\u7535\u6C60\u4FE1\u606F\u5931\u8D25");
-        Object.assign(_qi2Diag.current, { health: s2.batteryHealth, cycles: s2.cycleCount, level: s2.batteryLevel, temp: s2.batteryTemperature, voltage: s2.batteryVoltage, fault: s2.chargeErrorNow ? s2.chargeErrorNow.code : -1, statusCode: s2.status ? s2.status.code : -1 });
-        if (t2 && s2.chargeErrorNow && s2.chargeErrorNow.code !== 0)
-          throw new Error("\u8BBE\u5907\u5F53\u524D\u5B58\u5728\u5F02\u5E38\uFF0C\u5DF2\u505C\u6B62\u5199\u5165");
+        const _fault = s2.chargeErrorNow ? (s2.chargeErrorNow.faultType !== undefined ? s2.chargeErrorNow.faultType : (s2.chargeErrorNow.code & 63)) : 0,
+          _chg = s2.chargeErrorNow ? (s2.chargeErrorNow.chgState !== undefined ? s2.chargeErrorNow.chgState : ((s2.chargeErrorNow.code >> 6) & 3)) : 0;
+        Object.assign(_qi2Diag.current, { health: s2.batteryHealth, cycles: s2.cycleCount, level: s2.batteryLevel, temp: s2.batteryTemperature, voltage: s2.batteryVoltage, chgState: _chg, fault: _fault, faultRaw: s2.chargeErrorNow ? s2.chargeErrorNow.code : -1, statusCode: s2.status ? s2.status.code : -1 });
+        if (t2 && _fault !== 0)
+          throw new Error("\u8BBE\u5907\u5F53\u524D\u5B58\u5728\u6545\u969C\uFF08\u4EE3\u7801 " + _fault + "\uFF09\uFF0C\u5DF2\u505C\u6B62\u5199\u5165");
         const d2 = await _qi2Ccm(a2, n2, s2.batteryHealth, s2.cycleCount, t2),
           u2 = _qi2Wait("0xF6", 6e3);
         await _e2.sendEncryptedQi2Command(e4, d2);
@@ -24473,8 +24481,8 @@ const { TabPane: Xh } = yc,
               throw new Error(_firstErr || "QI2.2\u8BBE\u7F6E\u5931\u8D25");
             }
           } catch (t2) {
-            _qi2Report(!!e4, false, (t2 && t2.message) || "unknown");
-            (_qi2Lock.current = !1),
+            (_qi2Lock.current = !1), _setQi2Busy(!1),
+              _qi2Report(!!e4, false, (t2 && t2.message) || "unknown"),
               _setQi2Busy(!1),
               ju.error({
                 title: "QI 2.2",
@@ -24483,10 +24491,7 @@ const { TabPane: Xh } = yc,
               });
             return;
           }
-          setTimeout(() => _qi2Fetch(), 1200),
-            setTimeout(() => {
-              _qi2Lock.current && ((_qi2Lock.current = !1), _setQi2Busy(!1));
-            }, 9e3);
+          (_qi2Lock.current = !1), _setQi2Busy(!1), setTimeout(() => _qi2Fetch(), 1200);
         }
       };
     Nt.useEffect(() => {

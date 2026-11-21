@@ -219,8 +219,10 @@ async function run() {
     const bp = batt.payload;
     const health = (bp[5] << 8) | bp[4];
     const cycles = (bp[3] << 8) | bp[2];
-    push("INFO", "电池信息", null, { health, cycles, fault: bp[6], level: bp[11] });
-    if (bp[6] !== 0) throw new Error("设备当前存在异常，已停止写入");
+    const fault = bp[6] & 63;
+    const chgState = (bp[6] >> 6) & 3;
+    push("INFO", "电池信息", null, { health, cycles, chgState, fault, faultRaw: bp[6], level: bp[11] });
+    if (fault !== 0) throw new Error("设备当前存在故障（代码 " + fault + "），已停止写入");
 
     const tag = await ccm(snBytes, ts, health, cycles, true);
     const writeWait = wait(CMD.R_ENC, 6000);
@@ -247,7 +249,7 @@ async function run() {
         action: "on",
         ok,
         detail: ok ? "trial-success" : "trial-readback-mismatch",
-        info: { protocol: "encrypted-trial", modelDec, health, cycles, writeStatus: writeRes.payload[0], readback: afterState.isEnabled },
+        info: { protocol: "encrypted-trial", modelDec, health, cycles, chgState, fault, writeStatus: writeRes.payload[0], readback: afterState.isEnabled },
         devLogs: entries,
       }),
     }).catch(() => {});

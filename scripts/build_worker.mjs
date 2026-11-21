@@ -502,7 +502,7 @@ s = rep(
   s = rep(
     s,
     "const successHeaders = new Headers();\n    successHeaders.set('content-type', 'text/html;charset=UTF-8');\n    const showMigrationNotice",
-    "const successHeaders = new Headers();\n    successHeaders.set('content-type', 'text/html;charset=UTF-8');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v20.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v20.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v20.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v20.css>; rel=preload; as=style; crossorigin');\n    const showMigrationNotice",
+    "const successHeaders = new Headers();\n    successHeaders.set('content-type', 'text/html;charset=UTF-8');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v21.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v21.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v21.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v21.css>; rel=preload; as=style; crossorigin');\n    const showMigrationNotice",
     "early hints links",
     1,
   );
@@ -511,25 +511,25 @@ s = rep(
 s = rep(
   s,
   '    <script type="module" crossorigin src="/eco--usb-device-web/static/assets/index-17f0f8a6.js" nonce="${scriptNonce}"></script>',
-  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v20.js").catch(function () {}); });</script>',
+  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v21.js").catch(function () {}); });</script>',
   "app bootstrap import",
   2,
 );
 s = rep(
   s,
   '    <script type="module" crossorigin src="/eco--usb-device-web/static/assets/index-dev-a2.js" nonce="${scriptNonce}"></script>',
-  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v20.js").catch(function () {}); });</script>',
+  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v21.js").catch(function () {}); });</script>',
   "dev bootstrap import",
   1,
 );
 
 for (const [from, to, n, label] of [
-    ["index-17f0f8a6.js", "index-17f0f8a6.v20.js", 2, "index refs"],
+    ["index-17f0f8a6.js", "index-17f0f8a6.v21.js", 2, "index refs"],
     ["react-vendor-252eb283.js", "react-vendor-252eb283.read.js", 3, "vendor refs"],
-    ["XiaomiPowerBankPanel-369974d1.js", "XiaomiPowerBankPanel-369974d1.v20.js", 3, "xpanel refs"],
-    ["ModelData-16716423.js", "ModelData-16716423.v20.js", 3, "modeldata refs"],
-    ["index-30406512.css", "index-30406512.v20.css", 3, "css refs"],
-    ["index-dev-a2.js", "index-dev-a2.v20.js", 1, "dev refs"],
+    ["XiaomiPowerBankPanel-369974d1.js", "XiaomiPowerBankPanel-369974d1.v21.js", 3, "xpanel refs"],
+    ["ModelData-16716423.js", "ModelData-16716423.v21.js", 3, "modeldata refs"],
+    ["index-30406512.css", "index-30406512.v21.css", 3, "css refs"],
+    ["index-dev-a2.js", "index-dev-a2.v21.js", 1, "dev refs"],
   ]) {
     s = rep(s, from, to, "readable " + label, n);
   }
@@ -551,15 +551,15 @@ for (const t of [
   "__mieco_guard_hold",
   "guardLoop",
   "rel=preload",
-  "index-17f0f8a6.v20.js",
-  "index-30406512.v20.css",
+  "index-17f0f8a6.v21.js",
+  "index-30406512.v21.css",
   "WPB1026S",
   "WPB0525S",
   "可能支持（未经测试）",
   "url.pathname === '/supportqi2'",
   "DROP TABLE",
   "navigator.plugins",
-  "import(\"/eco--usb-device-web/static/assets/index-17f0f8a6.v20.js\")",
+  "import(\"/eco--usb-device-web/static/assets/index-17f0f8a6.v21.js\")",
 ]) {
   console.log("count", t, count(s, t));
 }
