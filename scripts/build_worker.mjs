@@ -327,7 +327,7 @@ s = rep(
     "        </div>",
     '        <pre id="qt-log" style="margin: 12px 0 0; max-height: 300px; overflow: auto; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-size: 11px; color: #374151; white-space: pre-wrap; word-break: break-all;"></pre>',
     "      </div>",
-    '      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v20.js"></script>',
+    '      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v21.js"></script>',
     '      <div style="font-size: 12px; color: #9ca3af; text-align: center; margin: 24px 0;">仅供学习研究 不推荐任何非官方修改设备行为 可能造成的安全和法律风险请自行承担</div>',
     "    </div>",
     "  </body>",

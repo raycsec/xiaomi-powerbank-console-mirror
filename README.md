@@ -36,6 +36,7 @@ src/index-dev.js               # Dev-mode bundle (no device gates)
 src/XiaomiPowerBankPanel.js    # Device panel: WebHID I/O, Qi2.2 control, stats UI
 src/ModelData.js               # Model metadata table (with Qi2.2 capability flags)
 src/ModelSupportPanel.js       # Supported models list component
+src/qi2-trial.js               # Standalone Qi2.2 trial script for /supportqi2 (WebHID, raw frame log)
 src/string-*.js                # i18n chunks
 src/index.css                  # Stylesheet
 src/react-vendor.js            # React runtime

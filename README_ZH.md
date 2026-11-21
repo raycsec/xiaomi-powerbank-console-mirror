@@ -36,6 +36,7 @@ src/index-dev.js               # 测试模式主包（不含设备门槛）
 src/XiaomiPowerBankPanel.js    # 设备面板：WebHID 读写、Qi2.2 控制与统计展示
 src/ModelData.js               # 型号数据表（含 Qi2.2 能力标记）
 src/ModelSupportPanel.js       # 支持型号列表页面组件
+src/qi2-trial.js               # /supportqi2 的独立 QI 2.2 尝试脚本（WebHID，原始帧日志）
 src/string-*.js                # 多语言文本分片
 src/index.css                  # 页面样式
 src/react-vendor.js            # React 运行时
