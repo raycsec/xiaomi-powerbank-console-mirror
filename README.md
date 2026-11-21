@@ -19,14 +19,12 @@ An unofficial mirror of the Xiaomi Power Bank WebHID console, adding full **Qi2.
 
 - **Native Qi2.2 Switch**: Integrated directly into the original device panel with matching UI, busy locks, and error prompts.
   - **Legacy models** (e.g., `WPB1025S`): Uses the original plaintext command.
-  - **Newer models** (`WPB1026S`, `WPB1025`): Uses the encrypted protocol (`re-handshake → read battery health & cycle count → derive session key → encrypted write → read-back verification`). Success is reported only when the read-back value matches.
-  - **Auto fallback**: `WPB1026S` tries the encrypted path first, `WPB1025S` tries the plaintext path first; if the first path is rejected the other one is attempted automatically.
-  - **`WPB0525S`**: the hardware supports QI 2.2, but the current enable method is not adapted yet - the firmware rejects both the encrypted and the plaintext command, so this model shows a read-only notice instead of a switch.
+  - **Newer models** (`WPB1026S`, `WPB0525S`, `WPB1025`): Uses the encrypted protocol (`re-handshake → read battery health & cycle count → derive session key → encrypted write → read-back verification`). Success is reported only when the read-back value matches.
 - **Model Support Labels**: Categorized into three tiers — **Supported**, **Encrypted Protocol**, and **Possibly Supported (Untested)**. Untested models display a "Try Enabling (Untested)" button with a yellow notice inside the card. Legacy-exclusive models (`P25`, `AC1067`, `P15`, `PB2020`) are retained for viewing (18 models in total).
 - **Activation Success Rate Statistics**: Each toggle reports one record (model, SN hash, action, result, failure detail) deduplicated by `(model, sn_hash, action)` in Cloudflare D1:
   - **Samples ≥ 5 & error rate > 30%**: Displays a yellow success-rate notice.
   - **Error rate < 10%**: Displays a green success rate with a checkmark.
-  - **Samples < 5**: No badge is shown; the success rate only appears once the sample size reaches 5.
+  - **Samples < 5**: Displays "Collecting" (`统计中`).
   - Reporting failures never block the toggle action or UI.
 
 ## Directory Structure
