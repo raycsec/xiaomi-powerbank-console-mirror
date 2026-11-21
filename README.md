@@ -24,7 +24,7 @@ An unofficial mirror of the Xiaomi Power Bank WebHID console, adding full **Qi2.
 - **Activation Success Rate Statistics**: Each toggle reports one record (model, SN hash, action, result, failure detail) deduplicated by `(model, sn_hash, action)` in Cloudflare D1:
   - **Samples ≥ 5 & error rate > 30%**: Displays a yellow success-rate notice.
   - **Error rate < 10%**: Displays a green success rate with a checkmark.
-  - **Samples < 5**: Displays "Collecting" (`统计中`).
+  - **Samples < 5**: No badge is shown; the success rate appears only once at least 5 samples exist.
   - Reporting failures never block the toggle action or UI.
 
 ## Directory Structure
