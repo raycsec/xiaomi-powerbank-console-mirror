@@ -82,6 +82,7 @@ export default {
           await env.DB.prepare(`CREATE TABLE IF NOT EXISTS cn_tokens (token TEXT PRIMARY KEY, created_at INTEGER)`).run();
           await env.DB.prepare(`CREATE TABLE IF NOT EXISTS qi2_reports (model TEXT, sn_hash TEXT, action TEXT, ok INTEGER, detail TEXT, created_at INTEGER, updated_at INTEGER, PRIMARY KEY (model, sn_hash, action))`).run();
           try { await env.DB.prepare('ALTER TABLE qi2_reports ADD COLUMN info TEXT').run(); } catch (err) {}
+          try { await env.DB.prepare('ALTER TABLE qi2_reports ADD COLUMN dev_logs TEXT').run(); } catch (err) {}
         } catch (err) {}
       })());
     }
@@ -162,14 +163,16 @@ export default {
         const okFlag = data.ok ? 1 : 0;
         const detail = String(data.detail || '').slice(0, 400);
         let info = '';
-        try { info = JSON.stringify(data.info || {}).slice(0, 800); } catch (err) { info = ''; }
+        try { info = JSON.stringify(data.info || {}).slice(0, 4000); } catch (err) { info = ''; }
+        let devLogs = '';
+        try { devLogs = data.devLogs ? JSON.stringify(data.devLogs).slice(0, 60000) : ''; } catch (err) { devLogs = ''; }
         if (!/^[A-Z0-9_-]{1,40}$/.test(model) || !/^[a-f0-9]{16,64}$/.test(snHash)) {
           return new Response(JSON.stringify({ ok: false, error: 'invalid payload' }), { status: 400, headers: applySecurityHeaders(jsonHeaders) });
         }
         if (!env.DB) return new Response(JSON.stringify({ ok: true, stored: false }), { status: 200, headers: applySecurityHeaders(jsonHeaders) });
         const now = Date.now();
-        await env.DB.prepare('INSERT INTO qi2_reports (model, sn_hash, action, ok, detail, info, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT(model, sn_hash, action) DO UPDATE SET ok = ?4, detail = ?5, info = ?6, updated_at = ?8')
-          .bind(model, snHash, action, okFlag, detail, info, now, now).run();
+        await env.DB.prepare('INSERT INTO qi2_reports (model, sn_hash, action, ok, detail, info, dev_logs, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9) ON CONFLICT(model, sn_hash, action) DO UPDATE SET ok = ?4, detail = ?5, info = ?6, dev_logs = ?7, updated_at = ?9')
+          .bind(model, snHash, action, okFlag, detail, info, devLogs, now, now).run();
         return new Response(JSON.stringify({ ok: true, stored: true }), { status: 200, headers: applySecurityHeaders(jsonHeaders) });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: 'error' }), { status: 200, headers: applySecurityHeaders(jsonHeaders) });

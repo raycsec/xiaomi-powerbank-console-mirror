@@ -317,6 +317,17 @@ s = rep(
     "      </div>",
     '      <div style="font-size: 14px; font-weight: 700; color: #111827; margin: 8px 4px 10px;">可能支持（未经测试）</div>',
     "      ${qi2UnknownHtml}",
+    '      <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px 24px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">',
+    '        <div style="font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 6px;">尝试开启（测试）</div>',
+    '        <p style="font-size: 13px; color: #6b7280; margin: 0 0 6px; line-height: 1.7;">不识别型号，只要设备已连接即可尝试。过程中会记录发送与接收的原始数据帧，可下载用于诊断。</p>',
+    '        <p style="font-size: 12px; color: #b45309; margin: 0 0 12px; line-height: 1.7;">仅用于未知型号的测试入口，可能对设备无效；请勿反复尝试。</p>',
+    '        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">',
+    '          <button id="qt-run" style="background: #f59e0b; color: #fff; border: 0; border-radius: 16px; padding: 8px 22px; font-size: 13px; font-weight: 600; cursor: pointer;">尝试开启</button>',
+    '          <span id="qt-status" style="font-size: 12px; color: #4b5563;">未开始</span>',
+    "        </div>",
+    '        <pre id="qt-log" style="margin: 12px 0 0; max-height: 300px; overflow: auto; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-size: 11px; color: #374151; white-space: pre-wrap; word-break: break-all;"></pre>',
+    "      </div>",
+    '      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v20.js"></script>',
     '      <div style="font-size: 12px; color: #9ca3af; text-align: center; margin: 24px 0;">仅供学习研究 不推荐任何非官方修改设备行为 可能造成的安全和法律风险请自行承担</div>',
     "    </div>",
     "  </body>",
@@ -344,11 +355,15 @@ s = rep(
   "    if (url.searchParams.get('reject') === '1') {",
   [
     "    if (url.pathname.startsWith('/eco--usb-device-web/')) {",
+    "      const assetExt = (url.pathname.match(/[.]([A-Za-z0-9]+)$/) || [])[1] || '';",
+    "      const mimeMap = { js: 'application/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json; charset=utf-8', map: 'application/json; charset=utf-8', svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', ico: 'image/x-icon', woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', wasm: 'application/wasm', html: 'text/html; charset=utf-8', txt: 'text/plain; charset=utf-8' };",
+    "      const assetMime = mimeMap[String(assetExt).toLowerCase()] || '';",
     "      const assetCacheKey = new Request(url.origin + url.pathname, { method: 'GET' });",
     "      const assetCache = caches.default;",
     "      let assetHit = null;",
     "      try { assetHit = await assetCache.match(assetCacheKey); } catch (err) {}",
-    "      if (assetHit) {",
+    "      const assetHitOk = !!(assetHit && (!assetMime || (assetHit.headers.get('content-type') || '') === assetMime));",
+    "      if (assetHitOk) {",
     "        return request.method === 'HEAD' ? new Response(null, { headers: assetHit.headers }) : assetHit;",
     "      }",
     "      try {",
@@ -356,6 +371,7 @@ s = rep(
     "        if (obj) {",
     "          const h = new Headers();",
     "          obj.writeHttpMetadata(h);",
+    "          if (assetMime) h.set('content-type', assetMime);",
     "          h.set('etag', obj.httpEtag);",
     "          h.set('cache-control', 'public, max-age=31536000, immutable');",
     "          h.set('x-content-type-options', 'nosniff');",
@@ -367,7 +383,6 @@ s = rep(
     "      } catch (err) {}",
     "      return new Response('Not Found', { status: 404, headers: applySecurityHeaders(new Headers()) });",
     "    }",
-    "",
     "    if (url.searchParams.get('reject') === '1') {",
   ].join("\n"),
   "asset route",
@@ -487,7 +502,7 @@ s = rep(
   s = rep(
     s,
     "const successHeaders = new Headers();\n    successHeaders.set('content-type', 'text/html;charset=UTF-8');\n    const showMigrationNotice",
-    "const successHeaders = new Headers();\n    successHeaders.set('content-type', 'text/html;charset=UTF-8');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v15.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v15.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v15.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v15.css>; rel=preload; as=style; crossorigin');\n    const showMigrationNotice",
+    "const successHeaders = new Headers();\n    successHeaders.set('content-type', 'text/html;charset=UTF-8');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v20.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v20.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v20.js>; rel=preload; as=script; crossorigin');\n    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v20.css>; rel=preload; as=style; crossorigin');\n    const showMigrationNotice",
     "early hints links",
     1,
   );
@@ -496,25 +511,25 @@ s = rep(
 s = rep(
   s,
   '    <script type="module" crossorigin src="/eco--usb-device-web/static/assets/index-17f0f8a6.js" nonce="${scriptNonce}"></script>',
-  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v15.js").catch(function () {}); });</script>',
+  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v20.js").catch(function () {}); });</script>',
   "app bootstrap import",
   2,
 );
 s = rep(
   s,
   '    <script type="module" crossorigin src="/eco--usb-device-web/static/assets/index-dev-a2.js" nonce="${scriptNonce}"></script>',
-  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v15.js").catch(function () {}); });</script>',
+  '    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v20.js").catch(function () {}); });</script>',
   "dev bootstrap import",
   1,
 );
 
 for (const [from, to, n, label] of [
-    ["index-17f0f8a6.js", "index-17f0f8a6.v15.js", 2, "index refs"],
+    ["index-17f0f8a6.js", "index-17f0f8a6.v20.js", 2, "index refs"],
     ["react-vendor-252eb283.js", "react-vendor-252eb283.read.js", 3, "vendor refs"],
-    ["XiaomiPowerBankPanel-369974d1.js", "XiaomiPowerBankPanel-369974d1.v15.js", 3, "xpanel refs"],
-    ["ModelData-16716423.js", "ModelData-16716423.v15.js", 3, "modeldata refs"],
-    ["index-30406512.css", "index-30406512.v15.css", 3, "css refs"],
-    ["index-dev-a2.js", "index-dev-a2.v15.js", 1, "dev refs"],
+    ["XiaomiPowerBankPanel-369974d1.js", "XiaomiPowerBankPanel-369974d1.v20.js", 3, "xpanel refs"],
+    ["ModelData-16716423.js", "ModelData-16716423.v20.js", 3, "modeldata refs"],
+    ["index-30406512.css", "index-30406512.v20.css", 3, "css refs"],
+    ["index-dev-a2.js", "index-dev-a2.v20.js", 1, "dev refs"],
   ]) {
     s = rep(s, from, to, "readable " + label, n);
   }
@@ -536,15 +551,15 @@ for (const t of [
   "__mieco_guard_hold",
   "guardLoop",
   "rel=preload",
-  "index-17f0f8a6.v15.js",
-  "index-30406512.v15.css",
+  "index-17f0f8a6.v20.js",
+  "index-30406512.v20.css",
   "WPB1026S",
   "WPB0525S",
   "可能支持（未经测试）",
   "url.pathname === '/supportqi2'",
   "DROP TABLE",
   "navigator.plugins",
-  "import(\"/eco--usb-device-web/static/assets/index-17f0f8a6.v15.js\")",
+  "import(\"/eco--usb-device-web/static/assets/index-17f0f8a6.v20.js\")",
 ]) {
   console.log("count", t, count(s, t));
 }

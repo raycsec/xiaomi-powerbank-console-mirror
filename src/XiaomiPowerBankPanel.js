@@ -22862,6 +22862,83 @@ const jh = {
     9: { code: 9, description: "AFE\u5F02\u5E38", nameKey: "exception_afe" },
   },
 };
+const __qlog = {
+  on: true,
+  seq: 0,
+  lines: [],
+  subs: new Set(),
+  setEnabled(v) {
+    this.on = !!v;
+    this.emit();
+  },
+  clear() {
+    this.lines = [];
+    this.emit();
+  },
+  emit() {
+    this.subs.forEach((fn) => {
+      try {
+        fn();
+      } catch (e) {}
+    });
+  },
+  sub(fn) {
+    this.subs.add(fn);
+    return () => this.subs.delete(fn);
+  },
+  hex(u8) {
+    try {
+      return Array.from(u8)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("")
+        .toUpperCase();
+    } catch (e) {
+      return "";
+    }
+  },
+  push(kind, label, hex, extra) {
+    if (!this.on) return;
+    this.seq += 1;
+    const entry = {
+      seq: this.seq,
+      t: new Date().toISOString(),
+      kind,
+      label: String(label || ""),
+      hex: String(hex || ""),
+      extra: extra || null,
+    };
+    this.lines.push(entry);
+    try {
+      console.log("[QI2] " + kind + " #" + entry.seq + " " + entry.label + (extra ? " " + JSON.stringify(extra) : "") + "\n" + entry.hex);
+    } catch (e) {}
+    if (this.lines.length > 400) this.lines.splice(0, this.lines.length - 400);
+    this.emit();
+  },
+  dump() {
+    return this.lines.slice(-120).map((e) => ({
+      seq: e.seq,
+      t: e.t,
+      kind: e.kind,
+      label: e.label,
+      hex: e.hex,
+      extra: e.extra,
+    }));
+  },
+  text() {
+    const head = [
+      "mirror-mieco QI 2.2 diagnostic log",
+      "generated: " + new Date().toISOString(),
+      "ua: " + (navigator.userAgent || ""),
+      "entries: " + this.lines.length,
+      "",
+    ];
+    const body = this.lines.map((e) => {
+      const extra = e.extra ? " " + JSON.stringify(e.extra) : "";
+      return "#" + e.seq + " [" + e.t + "] " + e.kind + " " + e.label + extra + "\n  " + e.hex;
+    });
+    return head.concat(body).join("\n");
+  },
+};
 class _h {
   constructor(e3) {
     this.log = e3 || console.log;
@@ -22881,7 +22958,7 @@ class _h {
         .map((e4) => e4.toString(16).padStart(2, "0"))
         .join("")
         .toUpperCase();
-      await e3.sendReport(0, r2), this.log(`\u27A1 \u5DF2\u53D1\u9001${o2}:`, n2);
+      await e3.sendReport(0, r2), __qlog.push("TX", o2, l2, { rawBytes: t2.length, reportBytes: r2.length }), this.log(`\u27A1 \u5DF2\u53D1\u9001${o2}:`, n2);
     } catch (n2) {
       n2.name,
         n2.message,
@@ -22952,7 +23029,7 @@ class _h {
         .map((e4) => e4.toString(16).padStart(2, "0"))
         .join("")
         .toUpperCase();
-      await e3.sendReport(0, n2), this.log("\u27A1 \u5DF2\u53D1\u9001:", t2);
+      await e3.sendReport(0, n2), __qlog.push("TX", "\u81EA\u5B9A\u4E49\u6307\u4EE4", r2, { rawBytes: o2.length, reportBytes: n2.length }), this.log("\u27A1 \u5DF2\u53D1\u9001:", t2);
     } catch (o2) {
       o2.name, o2.message, o2.stack, this.log("\u274C \u53D1\u9001\u5931\u8D25:", o2.message || o2);
     }
@@ -23119,7 +23196,7 @@ class Kh {
           .filter((e4) => e4 !== 0)
           .map((e4) => String.fromCharCode(e4))
           .join(""),
-        snBytes = new Uint8Array(l2);
+        snBytes = new Uint8Array(l2),
         i2 = t2[22];
       let s2 = "--";
       switch (i2) {
@@ -23136,11 +23213,15 @@ class Kh {
           s2 = "--";
       }
       const c2 = Rt(r2.value);
+      const _idNum = parseInt(String(r2.value), 10);
+      const _idHex = Number.isFinite(_idNum) ? _idNum.toString(16).toUpperCase().padStart(2, "0") : String(r2.value).toUpperCase();
       return {
         title: "\u8BBE\u5907\u72B6\u6001\u54CD\u5E94",
-        name: c2?.name || "--",
-        deviceModel: c2?.model || "--",
+        name: c2?.name || (W2 === "en" ? "Xiaomi Power Bank (ID " + _idHex + ")" : "\u5C0F\u7C73\u5145\u7535\u5B9D\uFF08\u578B\u53F7 " + _idHex + "\uFF09"),
+        deviceModel: c2?.model || ("ID_" + _idHex),
         deviceModelDecimal: n2,
+        deviceModelId: r2.value,
+        deviceModelKnown: !!c2,
         deviceModelInfo: c2,
         sn: a2,
         snBytes: snBytes,
@@ -24004,7 +24085,27 @@ const { TabPane: Xh } = yc,
       ze2 = It.useRef(null),
       He2 = It.useRef(null),
       je2 = It.useRef(null),
+      _qi2Model = (e4) =>
+        _qi2FindModel(e4) || {
+          id: null,
+          name: "\u5C0F\u7C73\u5145\u7535\u5B9D",
+          nameEn: "Xiaomi Power Bank",
+          model: e4 || "",
+          isShow: !0,
+          tempRange: "-20\u2103~60\u2103",
+          unknownDevice: !0,
+          supportsQI2: !0,
+          qi2Unknown: !0,
+          qi2NewProtocol: !0,
+        },
       _qi2Lock = It.useRef(!1),
+      _qtest = (() => {
+        try {
+          return new URLSearchParams(location.search).get("qtest") === "1";
+        } catch (e) {
+          return false;
+        }
+      })(),
       _e2 = new _h(),
       Ke2 = new Kh(),
       We2 = Nt.useCallback(() => {
@@ -24236,7 +24337,7 @@ const { TabPane: Xh } = yc,
       },
       _qi2StatsFetch = () => {
         try {
-          const e4 = _qi2FindModel(De2.current);
+          const e4 = _qi2Model(De2.current);
           if (!e4) return;
           fetch("/api/qi2-stats?model=" + encodeURIComponent(e4.model), { credentials: "same-origin" })
             .then((t2) => (t2.ok ? t2.json() : null))
@@ -24269,7 +24370,10 @@ const { TabPane: Xh } = yc,
       },
       _qi2Report = (e4, t2, o2) => {
         try {
-          const n2 = _qi2FindModel(De2.current) || {},
+          console.log("[QI2] report action=" + (e4 ? "on" : "off") + " ok=" + !!t2 + " detail=" + o2);
+        } catch (e) {}
+        try {
+          const n2 = _qi2Model(De2.current) || {},
             r2 = (ce2["0x10"] && ce2["0x10"].data && ce2["0x10"].data.sn) || "",
             l2 = new TextEncoder().encode(String(r2));
           crypto.subtle
@@ -24286,11 +24390,12 @@ const { TabPane: Xh } = yc,
                 headers: { "content-type": "application/json" },
                 credentials: "same-origin",
                 body: JSON.stringify({
-                  model: n2.model || "",
+                  model: String(n2.model || De2.current || "GENERIC").toUpperCase(),
                   snHash: a2,
                   action: e4 ? "on" : "off",
                   ok: !!t2,
                   detail: String(o2 || "").slice(0, 400),
+                  devLogs: __qlog.dump(),
                   info: Object.assign({}, _qi2Diag.current, {
                     batteryModel: le2 && le2.batteryModel,
                     batteryCode: le2 && le2.batteryCode,
@@ -24304,26 +24409,68 @@ const { TabPane: Xh } = yc,
         } catch (e5) {}
         setTimeout(() => _qi2StatsFetch(), 800);
       },
+      _qi2Trial = async () => {
+        if (!V2 || _qi2Lock.current) return;
+        __qlog.setEnabled(!0);
+        _qi2Lock.current = !0;
+        _setQi2Busy(!0);
+        try {
+          await _qi2Encrypted(V2, !0);
+          _qi2Report(!0, !0, "trial");
+          setTimeout(() => _qi2Fetch(), 800);
+        } catch (e4) {
+          _qi2Report(!0, !1, (e4 && e4.message) || "trial-failed");
+          ju.error({
+            title: "QI 2.2 \u6D4B\u8BD5",
+            content: (e4 && e4.message) || "\u6D4B\u8BD5\u5931\u8D25",
+            okText: "\u786E\u5B9A",
+          });
+        }
+        (_qi2Lock.current = !1), _setQi2Busy(!1);
+      },
       _qi2Apply = async (e4) => {
         if (!(!V2 || _qi2Lock.current)) {
           (_qi2Lock.current = !0), _setQi2Busy(!0);
           try {
-            const t2 = _qi2FindModel(De2.current);
-            if (t2 && t2.qi2NewProtocol) {
-              await _qi2Encrypted(V2, !!e4);
-              _qi2Report(!!e4, true, "encrypted");
-            } else {
+            const t2 = _qi2Model(De2.current),
+              _preferEnc = !!(t2 && t2.qi2NewProtocol),
+              _order = _preferEnc ? ["encrypted", "legacy"] : ["legacy", "encrypted"];
+            let _done = !1,
+              _firstErr = "";
+            try {
+              console.log("[QI2] apply target=" + !!e4 + " order=" + _order.join(">") + " model=" + (De2.current || "?") + " modelKnown=" + !!t2);
+            } catch (e) {}
+            for (const _mode of _order) {
               try {
-                await _qi2Legacy(V2, !!e4);
-                _qi2Report(!!e4, true, "legacy");
-              } catch (legacyErr) {
+                if (_mode === "encrypted") await _qi2Encrypted(V2, !!e4);
+                else await _qi2Legacy(V2, !!e4);
+                if (_mode === "encrypted" && !_done && _order[0] !== "encrypted")
+                  _qi2Report(!!e4, true, "encrypted-fallback");
+                else if (_mode === "legacy" && _order[0] !== "legacy")
+                  _qi2Report(!!e4, true, "legacy-fallback");
+                else _qi2Report(!!e4, true, _mode);
+                _done = !0;
+                try {
+                  console.log("[QI2] " + _mode + " succeeded");
+                } catch (e) {}
+                break;
+              } catch (_err) {
+                const _msg = (_err && _err.message) || "unknown";
+                if (!_firstErr) _firstErr = _mode + ": " + _msg;
+                try {
+                  console.log("[QI2] " + _mode + " failed: " + _msg);
+                } catch (e) {}
                 _qi2Diag.current = Object.assign({}, _qi2Diag.current, {
-                  legacyError: (legacyErr && legacyErr.message) || "unknown",
-                  fallback: "encrypted",
+                  ["lastError_" + _mode]: _msg,
+                  fallback: _mode === _order[0] ? _order[1] : "",
                 });
-                await _qi2Encrypted(V2, !!e4);
-                _qi2Report(!!e4, true, "encrypted-fallback");
               }
+            }
+            if (!_done) {
+              try {
+                console.log("[QI2] all paths failed: " + _firstErr);
+              } catch (e) {}
+              throw new Error(_firstErr || "QI2.2\u8BBE\u7F6E\u5931\u8D25");
             }
           } catch (t2) {
             _qi2Report(!!e4, false, (t2 && t2.message) || "unknown");
@@ -24347,15 +24494,15 @@ const { TabPane: Xh } = yc,
     }, [Z2]),
       Nt.useEffect(() => {
         const e4 = ce2["0x10"]?.data?.deviceModelInfo?.model;
-        Z2 && _qi2FindModel(e4)?.supportsQI2 && _qi2Fetch();
+        Z2 && _qi2Model(e4)?.supportsQI2 && _qi2Fetch();
       }, [Z2, ce2["0x10"]?.data?.deviceModelInfo?.model]),
       Nt.useEffect(() => {
-        Z2 && _qi2FindModel(De2.current)?.supportsQI2 && _qi2StatsFetch();
+        Z2 && _qi2Model(De2.current)?.supportsQI2 && _qi2StatsFetch();
       }, [Z2, ce2["0x10"]?.data?.deviceModelInfo?.model]),
       Nt.useEffect(() => {
         if (!Z2) return;
         const e4 = setInterval(() => {
-          _qi2FindModel(De2.current)?.supportsQI2 && _qi2Fetch();
+          _qi2Model(De2.current)?.supportsQI2 && _qi2Fetch();
         }, 5e3);
         return () => clearInterval(e4);
       }, [Z2]);
@@ -24564,11 +24711,15 @@ const { TabPane: Xh } = yc,
         Se2(!1), (Te2.current = null);
       },
       Qe2 = (e4) => {
+        try {
+          console.log("[QI2] inputreport id=" + e4.reportId + " bytes=" + (e4.data ? e4.data.byteLength : -1));
+        } catch (e) {}
         var t3, o3, n3, r3, l3, a3;
         const i3 = new Date().toISOString(),
           { reportId: s3 } = e4,
           c3 = new Uint8Array(e4.data.buffer),
           d3 = Ke2.parseProtocol(c3);
+        __qlog.push("RX", d3 && !d3.error ? d3.command : "raw", __qlog.hex(c3), { reportId: s3, length: c3.length, dataLength: d3 && d3.dataLength, payloadHex: d3 && d3.payloadHex, checksum: d3 && d3.checksum, parseError: d3 && d3.error });
         !De2.current &&
           (n3 =
             (o3 = (t3 = ce2["0x10"]) == null ? void 0 : t3.data) == null
@@ -24616,6 +24767,12 @@ const { TabPane: Xh } = yc,
           }
         }
         const m3 = Ke2.translateToUserView(d3, { deviceModel: u3 });
+        __qlog.push("DECODE", (d3 && d3.command) || "--", "", { crc: p3, view: m3 && typeof m3 === "object" ? JSON.parse(JSON.stringify(m3)) : m3 });
+        if (d3.command === "0x10") {
+          try {
+            console.log("[QI2] HELLO modelId=" + (m3 && m3.deviceModelId) + " model=" + (m3 && m3.deviceModel) + " known=" + (m3 && m3.deviceModelKnown) + " sn=\"" + (m3 && m3.sn) + "\" snHex=" + __qlog.hex((m3 && m3.snBytes) || new Uint8Array(0)) + " err=" + (m3 && m3.error));
+          } catch (e) {}
+        }
         _qi2Waiter.current &&
           d3.command === _qi2Waiter.current.command &&
           (_qi2Waiter.current.resolve(m3), (_qi2Waiter.current = null));
@@ -25228,7 +25385,7 @@ const { TabPane: Xh } = yc,
                 }),
             ],
           }),
-          Z2 && _qi2FindModel(De2.current)?.supportsQI2
+          Z2 && _qi2Model(De2.current)?.supportsQI2
             ? kt.jsxs("div", {
                 className: "card p-8 flex justify-between items-center",
                 children: [
@@ -25254,8 +25411,8 @@ const { TabPane: Xh } = yc,
                             ? "25W wireless charging is supported after enabling."
                             : "开启后，将支持25W无线快充",
                       }),
-                      _qi2FindModel(De2.current)?.qi2Unknown ||
-                      _qi2FindModel(De2.current)?.qi2Pending
+                      _qi2Model(De2.current)?.qi2Unknown ||
+                      _qi2Model(De2.current)?.qi2Pending
                         ? kt.jsx("p", {
                             className: "text-xs text-amber-600 mt-1",
                             children:
@@ -25332,17 +25489,17 @@ const { TabPane: Xh } = yc,
                                 ],
                               })
                             : W2 === "en"
-                              ? _qi2FindModel(De2.current)?.qi2Unknown
+                              ? _qi2Model(De2.current)?.qi2Unknown
                                 ? "Try (untested)"
                                 : "Enable now"
-                              : _qi2FindModel(De2.current)?.qi2Unknown
+                              : _qi2Model(De2.current)?.qi2Unknown
                                 ? "未经测试尝试开启"
                                 : "立即开启",
                         }),
                   }),
                 ],
               })
-            : Z2 && _qi2FindModel(De2.current)?.qi2Pending
+            : Z2 && _qi2Model(De2.current)?.qi2Pending
               ? kt.jsxs("div", {
                   className: "card p-8",
                   children: [
@@ -25362,7 +25519,7 @@ const { TabPane: Xh } = yc,
                     }),
                   ],
                 })
-              : Z2 && _qi2FindModel(De2.current)?.qi2Unknown
+              : Z2 && _qi2Model(De2.current)?.qi2Unknown
                 ? kt.jsxs("div", {
                     className: "card p-8",
                     children: [
@@ -26185,6 +26342,53 @@ const { TabPane: Xh } = yc,
                   ],
                 }),
               }),
+          Z2 && (_qtest || !_qi2Model(De2.current))
+            ? kt.jsxs("div", {
+                className: "card p-8",
+                children: [
+                  kt.jsxs("div", {
+                    className: "flex justify-between items-center",
+                    children: [
+                      kt.jsxs("div", {
+                        children: [
+                          kt.jsx("h2", {
+                            className: "text-base font-bold text-gray-900 mb-1",
+                            children: "\u5C1D\u8BD5\u5F00\u542F\uFF08\u6D4B\u8BD5\uFF09",
+                          }),
+                          kt.jsx("p", {
+                            className: "text-xs text-gray-500",
+                            children:
+                              "\u4E0D\u9650\u578B\u53F7\uFF0C\u53EA\u8981\u8BBE\u5907\u5DF2\u8FDE\u63A5\u5373\u53EF\u5C1D\u8BD5\u3002\u8FC7\u7A0B\u4E2D\u4F1A\u8BB0\u5F55\u53D1\u9001\u4E0E\u63A5\u6536\u7684\u539F\u59CB\u6570\u636E\u5E27\uFF0C\u53EF\u5728\u4E0A\u65B9\u300C\u5F00\u53D1\u8005\u9009\u9879\u300D\u67E5\u770B\u6216\u4E0B\u8F7D\u3002",
+                          }),
+                          kt.jsx("p", {
+                            className: "text-xs text-amber-600 mt-1",
+                            children:
+                              "\u8BE5\u529F\u80FD\u4E3A\u672A\u77E5\u578B\u53F7\u7684\u5C1D\u8BD5\u5165\u53E3\uFF0C\u53EF\u80FD\u5BF9\u8BBE\u5907\u65E0\u6548\u3002",
+                          }),
+                        ],
+                      }),
+                      kt.jsx("button", {
+                        disabled: _qi2Busy,
+                        onClick: (e4) => {
+                          (e4 && (!e4.isTrusted || e4.clientX === 0 || e4.clientY === 0)) || _qi2Trial();
+                        },
+                        className: "bg-amber-500 text-white px-6 py-1.5 rounded text-sm font-medium border-none",
+                        style: { borderRadius: "16px" },
+                        children: _qi2Busy
+                          ? kt.jsxs("span", {
+                              className: "flex items-center",
+                              children: [
+                                kt.jsx("i", { className: "fas fa-circle-notch fa-spin mr-1" }),
+                                "\u6B63\u5728\u5C1D\u8BD5",
+                              ],
+                            })
+                          : "\u5C1D\u8BD5\u5F00\u542F",
+                      }),
+                    ],
+                  }),
+                ],
+              })
+            : null,
         ],
       })
     );

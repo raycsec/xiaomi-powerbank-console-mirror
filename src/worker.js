@@ -76,11 +76,15 @@ export default {
       return new Response(request.method === 'HEAD' ? null : svgBytes, { headers: applySecurityHeaders(svgHeaders) });
     }
     if (url.pathname.startsWith('/eco--usb-device-web/')) {
+      const assetExt = (url.pathname.match(/[.]([A-Za-z0-9]+)$/) || [])[1] || '';
+      const mimeMap = { js: 'application/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json; charset=utf-8', map: 'application/json; charset=utf-8', svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', ico: 'image/x-icon', woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', wasm: 'application/wasm', html: 'text/html; charset=utf-8', txt: 'text/plain; charset=utf-8' };
+      const assetMime = mimeMap[String(assetExt).toLowerCase()] || '';
       const assetCacheKey = new Request(url.origin + url.pathname, { method: 'GET' });
       const assetCache = caches.default;
       let assetHit = null;
       try { assetHit = await assetCache.match(assetCacheKey); } catch (err) {}
-      if (assetHit) {
+      const assetHitOk = !!(assetHit && (!assetMime || (assetHit.headers.get('content-type') || '') === assetMime));
+      if (assetHitOk) {
         return request.method === 'HEAD' ? new Response(null, { headers: assetHit.headers }) : assetHit;
       }
       try {
@@ -88,6 +92,7 @@ export default {
         if (obj) {
           const h = new Headers();
           obj.writeHttpMetadata(h);
+          if (assetMime) h.set('content-type', assetMime);
           h.set('etag', obj.httpEtag);
           h.set('cache-control', 'public, max-age=31536000, immutable');
           h.set('x-content-type-options', 'nosniff');
@@ -99,7 +104,6 @@ export default {
       } catch (err) {}
       return new Response('Not Found', { status: 404, headers: applySecurityHeaders(new Headers()) });
     }
-
     const DEV_MODE = env.MIRROR_DEV_MODE === '1';
 
     if (DEV_MODE) {
@@ -137,11 +141,11 @@ export default {
         }catch(e){}
       })();
     </script>
-    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v15.js").catch(function () {}); });</script>
+    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v20.js").catch(function () {}); });</script>
     <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/react-vendor-252eb283.read.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v15.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v15.js" nonce="${scriptNonce}">
-    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v15.css" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v20.js" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v20.js" nonce="${scriptNonce}">
+    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v20.css" nonce="${scriptNonce}">
   </head>
   <body style="margin: 0;">
     <div id="blue-banner" style="position: fixed; top: 0px; left: 0px; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; z-index: 999999; font-family: sans-serif; box-sizing: border-box;">
@@ -223,6 +227,7 @@ export default {
           await env.DB.prepare(`CREATE TABLE IF NOT EXISTS cn_tokens (token TEXT PRIMARY KEY, created_at INTEGER)`).run();
           await env.DB.prepare(`CREATE TABLE IF NOT EXISTS qi2_reports (model TEXT, sn_hash TEXT, action TEXT, ok INTEGER, detail TEXT, created_at INTEGER, updated_at INTEGER, PRIMARY KEY (model, sn_hash, action))`).run();
           try { await env.DB.prepare('ALTER TABLE qi2_reports ADD COLUMN info TEXT').run(); } catch (err) {}
+          try { await env.DB.prepare('ALTER TABLE qi2_reports ADD COLUMN dev_logs TEXT').run(); } catch (err) {}
         } catch (err) {}
       })());
     }
@@ -303,14 +308,16 @@ export default {
         const okFlag = data.ok ? 1 : 0;
         const detail = String(data.detail || '').slice(0, 400);
         let info = '';
-        try { info = JSON.stringify(data.info || {}).slice(0, 800); } catch (err) { info = ''; }
+        try { info = JSON.stringify(data.info || {}).slice(0, 4000); } catch (err) { info = ''; }
+        let devLogs = '';
+        try { devLogs = data.devLogs ? JSON.stringify(data.devLogs).slice(0, 60000) : ''; } catch (err) { devLogs = ''; }
         if (!/^[A-Z0-9_-]{1,40}$/.test(model) || !/^[a-f0-9]{16,64}$/.test(snHash)) {
           return new Response(JSON.stringify({ ok: false, error: 'invalid payload' }), { status: 400, headers: applySecurityHeaders(jsonHeaders) });
         }
         if (!env.DB) return new Response(JSON.stringify({ ok: true, stored: false }), { status: 200, headers: applySecurityHeaders(jsonHeaders) });
         const now = Date.now();
-        await env.DB.prepare('INSERT INTO qi2_reports (model, sn_hash, action, ok, detail, info, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT(model, sn_hash, action) DO UPDATE SET ok = ?4, detail = ?5, info = ?6, updated_at = ?8')
-          .bind(model, snHash, action, okFlag, detail, info, now, now).run();
+        await env.DB.prepare('INSERT INTO qi2_reports (model, sn_hash, action, ok, detail, info, dev_logs, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9) ON CONFLICT(model, sn_hash, action) DO UPDATE SET ok = ?4, detail = ?5, info = ?6, dev_logs = ?7, updated_at = ?9')
+          .bind(model, snHash, action, okFlag, detail, info, devLogs, now, now).run();
         return new Response(JSON.stringify({ ok: true, stored: true }), { status: 200, headers: applySecurityHeaders(jsonHeaders) });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: 'error' }), { status: 200, headers: applySecurityHeaders(jsonHeaders) });
@@ -773,10 +780,10 @@ export default {
 
     const successHeaders = new Headers();
     successHeaders.set('content-type', 'text/html;charset=UTF-8');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v15.js>; rel=preload; as=script; crossorigin');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v15.js>; rel=preload; as=script; crossorigin');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v15.js>; rel=preload; as=script; crossorigin');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v15.css>; rel=preload; as=style; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v20.js>; rel=preload; as=script; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v20.js>; rel=preload; as=script; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v20.js>; rel=preload; as=script; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v20.css>; rel=preload; as=style; crossorigin');
     const showMigrationNotice = url.hostname === 'mirror-mieco.nalaniflynn.cn';
     const migrationHtml = showMigrationNotice ? '<div style="margin-top: 6px;">网站即将迁移到 <a href="https://mirror-mieco.raycsec.com/" style="color:#fff;text-decoration:underline;">https://mirror-mieco.raycsec.com/</a></div>' : '';
     const repoHtml = '<div style="margin-top: 6px;">开源地址：<a href="https://github.com/raycsec/xiaomi-powerbank-console-mirror" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;">github.com/raycsec/xiaomi-powerbank-console-mirror</a></div>';
@@ -830,11 +837,11 @@ export default {
     </script>
     <style nonce="${scriptNonce}">:root { --banner-height: 0px; } body { padding-top: var(--banner-height) !important; } .fixed-header { top: var(--banner-height) !important; }</style>
     ${scriptTagMain}
-    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v15.js").catch(function () {}); });</script>
+    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v20.js").catch(function () {}); });</script>
     <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/react-vendor-252eb283.read.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v15.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v15.js" nonce="${scriptNonce}">
-    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v15.css" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v20.js" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v20.js" nonce="${scriptNonce}">
+    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v20.css" nonce="${scriptNonce}">
   </head>
   <body style="margin: 0;">
     <div id="blue-banner" style="position: fixed; top: 0px; left: 0px; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; z-index: 999999; font-family: sans-serif; box-sizing: border-box;">
@@ -997,6 +1004,17 @@ export default {
       </div>
       <div style="font-size: 14px; font-weight: 700; color: #111827; margin: 8px 4px 10px;">可能支持（未经测试）</div>
       ${qi2UnknownHtml}
+      <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px 24px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+        <div style="font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 6px;">尝试开启（测试）</div>
+        <p style="font-size: 13px; color: #6b7280; margin: 0 0 6px; line-height: 1.7;">不识别型号，只要设备已连接即可尝试。过程中会记录发送与接收的原始数据帧，可下载用于诊断。</p>
+        <p style="font-size: 12px; color: #b45309; margin: 0 0 12px; line-height: 1.7;">仅用于未知型号的测试入口，可能对设备无效；请勿反复尝试。</p>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <button id="qt-run" style="background: #f59e0b; color: #fff; border: 0; border-radius: 16px; padding: 8px 22px; font-size: 13px; font-weight: 600; cursor: pointer;">尝试开启</button>
+          <span id="qt-status" style="font-size: 12px; color: #4b5563;">未开始</span>
+        </div>
+        <pre id="qt-log" style="margin: 12px 0 0; max-height: 300px; overflow: auto; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-size: 11px; color: #374151; white-space: pre-wrap; word-break: break-all;"></pre>
+      </div>
+      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v20.js"></script>
       <div style="font-size: 12px; color: #9ca3af; text-align: center; margin: 24px 0;">仅供学习研究 不推荐任何非官方修改设备行为 可能造成的安全和法律风险请自行承担</div>
     </div>
   </body>
@@ -1054,11 +1072,11 @@ export default {
     </script>
     <style nonce="${scriptNonce}">:root { --banner-height: 0px; } body { padding-top: var(--banner-height) !important; } .fixed-header { top: var(--banner-height) !important; }</style>
     ${scriptTagMain}
-    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v15.js").catch(function () {}); });</script>
+    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v20.js").catch(function () {}); });</script>
     <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/react-vendor-252eb283.read.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v15.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v15.js" nonce="${scriptNonce}">
-    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v15.css" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v20.js" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v20.js" nonce="${scriptNonce}">
+    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v20.css" nonce="${scriptNonce}">
   </head>
   <body style="margin: 0;">
     <div id="blue-banner" style="position: fixed; top: 0px; left: 0px; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; z-index: 999999; font-family: sans-serif; box-sizing: border-box;">
