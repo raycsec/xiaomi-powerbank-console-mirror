@@ -25512,8 +25512,8 @@ const { TabPane: Xh } = yc,
                       className: "text-base font-bold text-gray-900 mb-1",
                       children:
                         W2 === "en"
-                          ? "Qi 2.2 is supported by this hardware, but the current enable method is not compatible yet"
-                          : "\u8BE5\u8BBE\u5907\u7684 QI 2.2 \u5F00\u542F\u65B9\u5F0F\u6682\u4E0D\u9002\u914D",
+                          ? "Hardware supports Qi 2.2; the current enable method is not adapted yet"
+                          : "\u786C\u4EF6\u652F\u6301 QI 2.2\uFF0C\u76EE\u524D\u5F00\u542F\u65B9\u5F0F\u6682\u4E0D\u9002\u914D",
                     }),
                     kt.jsx("p", {
                       className: "text-xs text-gray-500 leading-relaxed",

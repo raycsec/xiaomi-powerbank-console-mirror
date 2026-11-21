@@ -29935,7 +29935,7 @@ const T$ = ({ children: e6 }) => {
   },
   $$ = r.lazy(() =>
     bm(
-      () => import("./XiaomiPowerBankPanel-369974d1.read26.js"),
+      () => import("./XiaomiPowerBankPanel.js"),
       [
         "assets/XiaomiPowerBankPanel-369974d1.read26.js",
         "assets/react-vendor-252eb283.read.js",
@@ -29945,7 +29945,7 @@ const T$ = ({ children: e6 }) => {
   ),
   M$ = r.lazy(() =>
     bm(
-      () => import("./ModelSupportPanel-ec289ffd.read26.js"),
+      () => import("./ModelSupportPanel.js"),
       [
         "assets/ModelSupportPanel-ec289ffd.read26.js",
         "assets/react-vendor-252eb283.read.js",
