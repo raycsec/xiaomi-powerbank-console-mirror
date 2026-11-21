@@ -1,7 +1,7 @@
 const HEAD = 165;
 const FRAME_SIZE = 32;
-const CMD = { HELLO: 0x10, BATT: 0x01, QI2_GET: 0x07, QI2_SET: 0x06, ENC: 0xE6, R_HELLO: 0x10, R_BATT: 0x11, R_QI2_GET: 0x17, R_QI2_SET: 0x16, R_ENC: 0xF6, ECHO: 0xFE };
-const MODEL_NAMES = { 9: "WPB1025S", 16: "WPB1026S", 10: "WPB0525S", 11: "WPB1007ZX", 12: "WPB1025", 19: "WPB1025S" };
+const CMD = { HELLO: 0x00, BATT: 0x01, QI2_GET: 0x07, QI2_SET: 0x06, ENC: 0xE6, R_HELLO: 0x10, R_BATT: 0x11, R_QI2_GET: 0x17, R_QI2_SET: 0x16, R_ENC: 0xF6, ECHO: 0xFE };
+const MODEL_NAMES = { 9: "WPB1025S", 19: "WPB1025S", 16: "WPB1026S", 10: "WPB0525S", 11: "WPB1007ZX", 12: "WPB1025" };
 
 const logEl = document.getElementById("qt-log");
 const statusEl = document.getElementById("qt-status");
@@ -18,7 +18,7 @@ function hex(bytes) {
 function push(kind, label, bytes, extra) {
   const row = { t: new Date().toISOString(), kind, label, hex: bytes ? hex(bytes) : "", extra: extra || null };
   entries.push(row);
-  if (entries.length > 300) entries.splice(0, entries.length - 300);
+  if (entries.length > 400) entries.splice(0, entries.length - 400);
   if (logEl) {
     logEl.textContent += "#" + entries.length + " " + row.t + " " + kind + " " + label + (row.extra ? " " + JSON.stringify(row.extra) : "") + "\n  " + row.hex + "\n";
     logEl.scrollTop = logEl.scrollHeight;
@@ -171,6 +171,23 @@ async function run(target) {
       }, ms || 4000);
       waiters.push({ command, resolve, timer });
     });
+  const queryStatus = async () => {
+    const w = wait(CMD.R_QI2_GET, 3000);
+    await send(buildFrame(CMD.QI2_GET, []), "查询 QI2 状态");
+    const res = await w;
+    if (!res) return null;
+    return { statusCode: res.payload[0], isEnabled: res.payload[1] === 1 };
+  };
+  const querySettled = async (target) => {
+    let last = null;
+    for (let i = 0; i < 6; i++) {
+      if (i) await new Promise((r) => setTimeout(r, 700));
+      last = await queryStatus();
+      push("INFO", "回读尝试 " + (i + 1), null, last || { note: "无响应" });
+      if (last && last.statusCode === 0 && last.isEnabled === target) return last;
+    }
+    return last;
+  };
 
   let modelName = "GENERIC";
   try {
@@ -182,25 +199,19 @@ async function run(target) {
     push("INFO", "timestamp", null, { ts, tsHex: ts.toString(16) });
     let snBytes = new Uint8Array(0);
     let modelDec = -1;
-    if (hello && hello.commandId === CMD.R_HELLO) {
+    if (hello && hello.commandId === CMD.R_HELLO && hello.payload.length >= 23) {
       const p = hello.payload;
       modelDec = p[0] | (p[1] << 8);
       snBytes = new Uint8Array(p.subarray(2, 22));
       modelName = MODEL_NAMES[modelDec] || "ID_" + modelDec;
       push("INFO", "hello", null, { modelDec, modelName, snLen: snBytes.length, snHex: hex(snBytes) });
-    } else if (hello && hello.commandId === CMD.ECHO) {
-      modelName = "ECHO_" + (picked.productId || 0).toString(16).toUpperCase();
-      push("INFO", "hello", null, { echo: true, note: "设备以回显方式应答，无法读取型号与序列号，将只尝试明文路径" });
     } else {
       modelName = "ECHO_" + (picked.productId || 0).toString(16).toUpperCase();
-      push("WARN", "hello", null, { note: "未收到 Hello 响应，继续尝试读取状态与明文路径" });
+      push("WARN", "hello", null, { note: hello ? "设备未返回设备信息（" + hello.command + "），仅尝试明文路径" : "未收到 Hello 响应，仅尝试明文路径" });
     }
 
-    const statusWait = wait(CMD.R_QI2_GET, 3000);
-    await send(buildFrame(CMD.QI2_GET, []), "查询 QI2 状态");
-    const status = await statusWait;
-    if (!status) throw new Error("查询 QI2.2 状态无响应");
-    const before = { statusCode: status.payload[0], isEnabled: status.payload[1] === 1 };
+    const before = await queryStatus();
+    if (!before) throw new Error("查询 QI2.2 状态无响应");
     push("INFO", "当前状态", null, before);
     if (before.statusCode !== 0) throw new Error("状态查询返回非 0：" + before.statusCode);
     if (before.isEnabled === target) {
@@ -211,11 +222,12 @@ async function run(target) {
     }
 
     let writeStatus = -1;
-    let usedPath = "";
+    let usedPath = "none";
     let fault = 0;
     let chgState = 0;
     let health = 0;
     let cycles = 0;
+    let wrote = false;
 
     if (snBytes.length) {
       const battWait = wait(CMD.R_BATT, 3500);
@@ -227,45 +239,44 @@ async function run(target) {
         cycles = (bp[3] << 8) | bp[2];
         fault = bp[6] & 63;
         chgState = (bp[6] >> 6) & 3;
-        push("INFO", "电池信息", null, { health, cycles, chgState, fault, faultRaw: bp[6], level: bp[11] });
-      } else {
-        push("WARN", "电池信息", null, { note: "电池信息无响应或长度不足，跳过加密路径" });
-      }
-      if (batt && batt.payload.length >= 18 && (fault === 0 || !target)) {
-        try {
-          const tag = await ccm(snBytes, ts, health, cycles, target);
-          const encWait = wait(CMD.R_ENC, 6000);
-          await send(buildFrame(CMD.ENC, Array.from(tag)), "设置 QI2（加密）");
-          const enc = await encWait;
-          writeStatus = enc ? enc.payload[0] : -1;
-          usedPath = "encrypted";
-          push("INFO", "加密写入结果", null, { status: writeStatus, ok: writeStatus === 0 });
-          if (!enc || writeStatus !== 0) usedPath = "";
-        } catch (err) {
-          push("WARN", "加密路径失败", null, { message: String((err && err.message) || err) });
-          usedPath = "";
+        push("INFO", "电池信息", null, { health, cycles, chgState, fault, faultRaw: bp[6], level: bp[12], temp: bp[13] > 127 ? bp[13] - 256 : bp[13] });
+        if (target && fault !== 0) {
+          push("WARN", "加密路径跳过", null, { reason: "故障码 " + fault });
+        } else {
+          try {
+            const tag = await ccm(snBytes, ts, health, cycles, target);
+            const encWait = wait(CMD.R_ENC, 6000);
+            await send(buildFrame(CMD.ENC, Array.from(tag)), target ? "设置 QI2（加密 开启）" : "设置 QI2（加密 关闭）");
+            const enc = await encWait;
+            writeStatus = enc ? enc.payload[0] : -1;
+            push("INFO", "加密写入结果", null, { status: writeStatus, responded: !!enc });
+            if (enc && writeStatus === 0) {
+              usedPath = "encrypted";
+              wrote = true;
+            }
+          } catch (err) {
+            push("WARN", "加密路径异常", null, { message: String((err && err.message) || err) });
+          }
         }
+      } else {
+        push("WARN", "电池信息", null, { note: "无响应或长度不足，跳过加密路径" });
       }
     }
 
-    if (!usedPath) {
+    if (!wrote) {
       const legacyWait = wait(CMD.R_QI2_SET, 5000);
       await send(buildFrame(CMD.QI2_SET, [target ? 1 : 0]), target ? "设置 QI2（明文 开启）" : "设置 QI2（明文 关闭）");
       const legacy = await legacyWait;
       writeStatus = legacy ? legacy.payload[0] : -1;
-      usedPath = legacy ? "legacy" : "";
-      push("INFO", "明文写入结果", null, { status: writeStatus, ok: writeStatus === 0, responded: !!legacy });
+      usedPath = legacy && writeStatus === 0 ? "legacy" : "legacy-rejected";
+      push("INFO", "明文写入结果", null, { status: writeStatus, responded: !!legacy });
     }
 
-    const readWait = wait(CMD.R_QI2_GET, 3000);
-    await send(buildFrame(CMD.QI2_GET, []), "回读 QI2 状态");
-    const after = await readWait;
-    const afterState = after ? { statusCode: after.payload[0], isEnabled: after.payload[1] === 1 } : null;
-    push("INFO", "回读状态", null, afterState || { note: "无响应" });
-    const ok = !!afterState && afterState.statusCode === 0 && afterState.isEnabled === target;
+    const after = await querySettled(target);
+    const ok = !!after && after.statusCode === 0 && after.isEnabled === target;
 
     try {
-      const snHash = await sha16(snBytes.length ? snBytes : new TextEncoder().encode(modelName));
+      const snHash = await sha16(snBytes.length ? snBytes : new TextEncoder().encode(modelName + ":" + picked.productId));
       await fetch("/api/qi2-report", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -275,8 +286,8 @@ async function run(target) {
           snHash,
           action: target ? "on" : "off",
           ok,
-          detail: ok ? "trial-" + (usedPath || "none") + "-ok" : "trial-readback-mismatch",
-          info: { protocol: "trial:" + (usedPath || "none"), modelDec, health, cycles, chgState, fault, writeStatus, readback: afterState ? afterState.isEnabled : "error" },
+          detail: ok ? "trial-" + usedPath + "-ok" : "trial-" + usedPath + "-readback-mismatch",
+          info: { protocol: "trial:" + usedPath, modelDec, health, cycles, chgState, fault, writeStatus, readback: after ? after.isEnabled : "error" },
           devLogs: entries,
         }),
       });

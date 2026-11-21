@@ -141,11 +141,11 @@ export default {
         }catch(e){}
       })();
     </script>
-    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v22.js").catch(function () {}); });</script>
+    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-dev-a2.v24.js").catch(function () {}); });</script>
     <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/react-vendor-252eb283.read.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v22.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v22.js" nonce="${scriptNonce}">
-    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v22.css" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v24.js" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v24.js" nonce="${scriptNonce}">
+    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v24.css" nonce="${scriptNonce}">
   </head>
   <body style="margin: 0;">
     <div id="blue-banner" style="position: fixed; top: 0px; left: 0px; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; z-index: 999999; font-family: sans-serif; box-sizing: border-box;">
@@ -780,10 +780,10 @@ export default {
 
     const successHeaders = new Headers();
     successHeaders.set('content-type', 'text/html;charset=UTF-8');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v22.js>; rel=preload; as=script; crossorigin');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v22.js>; rel=preload; as=script; crossorigin');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v22.js>; rel=preload; as=script; crossorigin');
-    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v22.css>; rel=preload; as=style; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-17f0f8a6.v24.js>; rel=preload; as=script; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v24.js>; rel=preload; as=script; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/ModelData-16716423.v24.js>; rel=preload; as=script; crossorigin');
+    successHeaders.append('Link', '</eco--usb-device-web/static/assets/index-30406512.v24.css>; rel=preload; as=style; crossorigin');
     const showMigrationNotice = url.hostname === 'mirror-mieco.nalaniflynn.cn';
     const migrationHtml = showMigrationNotice ? '<div style="margin-top: 6px;">网站即将迁移到 <a href="https://mirror-mieco.raycsec.com/" style="color:#fff;text-decoration:underline;">https://mirror-mieco.raycsec.com/</a></div>' : '';
     const repoHtml = '<div style="margin-top: 6px;">开源地址：<a href="https://github.com/raycsec/xiaomi-powerbank-console-mirror" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline;">github.com/raycsec/xiaomi-powerbank-console-mirror</a></div>';
@@ -837,11 +837,11 @@ export default {
     </script>
     <style nonce="${scriptNonce}">:root { --banner-height: 0px; } body { padding-top: var(--banner-height) !important; } .fixed-header { top: var(--banner-height) !important; }</style>
     ${scriptTagMain}
-    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v22.js").catch(function () {}); });</script>
+    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v24.js").catch(function () {}); });</script>
     <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/react-vendor-252eb283.read.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v22.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v22.js" nonce="${scriptNonce}">
-    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v22.css" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v24.js" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v24.js" nonce="${scriptNonce}">
+    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v24.css" nonce="${scriptNonce}">
   </head>
   <body style="margin: 0;">
     <div id="blue-banner" style="position: fixed; top: 0px; left: 0px; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; z-index: 999999; font-family: sans-serif; box-sizing: border-box;">
@@ -1015,7 +1015,7 @@ export default {
         </div>
         <pre id="qt-log" style="margin: 12px 0 0; max-height: 300px; overflow: auto; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-size: 11px; color: #374151; white-space: pre-wrap; word-break: break-all;"></pre>
       </div>
-      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v22.js"></script>
+      <script nonce="${scriptNonce}" src="/eco--usb-device-web/static/assets/qi2-trial.v24.js"></script>
       <div style="font-size: 12px; color: #9ca3af; text-align: center; margin: 24px 0;">仅供学习研究 不推荐任何非官方修改设备行为 可能造成的安全和法律风险请自行承担</div>
     </div>
   </body>
@@ -1073,11 +1073,11 @@ export default {
     </script>
     <style nonce="${scriptNonce}">:root { --banner-height: 0px; } body { padding-top: var(--banner-height) !important; } .fixed-header { top: var(--banner-height) !important; }</style>
     ${scriptTagMain}
-    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v22.js").catch(function () {}); });</script>
+    <script nonce="${scriptNonce}">document.addEventListener("DOMContentLoaded", function () { import("/eco--usb-device-web/static/assets/index-17f0f8a6.v24.js").catch(function () {}); });</script>
     <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/react-vendor-252eb283.read.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v22.js" nonce="${scriptNonce}">
-    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v22.js" nonce="${scriptNonce}">
-    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v22.css" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/XiaomiPowerBankPanel-369974d1.v24.js" nonce="${scriptNonce}">
+    <link rel="modulepreload" crossorigin href="/eco--usb-device-web/static/assets/ModelData-16716423.v24.js" nonce="${scriptNonce}">
+    <link rel="stylesheet" crossorigin href="/eco--usb-device-web/static/assets/index-30406512.v24.css" nonce="${scriptNonce}">
   </head>
   <body style="margin: 0;">
     <div id="blue-banner" style="position: fixed; top: 0px; left: 0px; width: 100%; background: rgb(0, 122, 204); color: white; text-align: center; padding: 8px 5px; font-size: 12px; z-index: 999999; font-family: sans-serif; box-sizing: border-box;">

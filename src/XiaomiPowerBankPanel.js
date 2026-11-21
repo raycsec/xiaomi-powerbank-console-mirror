@@ -22974,7 +22974,7 @@ class _h {
     return new Uint8Array([...r2, l2]);
   }
   async sendHelloCommand(e3) {
-    const t2 = Hh.encode("Hello", jh.CMD_HELLO);
+    const t2 = Hh.encode("Hello", Hh.CMD_HELLO);
     await this.sendCommand(e3, t2, "Hello\u547D\u4EE4");
   }
   async sendBatteryInfoCommand(e3) {
@@ -24297,6 +24297,23 @@ const { TabPane: Xh } = yc,
         for (let e5 = 0; e5 < 4; e5++) $2[5 + e5] = _2[e5] ^ v2[e5];
         return $2;
       },
+      _qi2QuerySettled = async (e4, t2, o2, n2) => {
+        const r2 = n2 || 6,
+          l2 = o2 || 700;
+        let a2 = null;
+        for (let i2 = 0; i2 < r2; i2++) {
+          if (i2) await new Promise((e5) => setTimeout(e5, l2));
+          try {
+            a2 = await _qi2QueryNow(e4);
+          } catch (e5) {
+            a2 = null;
+          }
+          _qi2Diag.current.readback = a2 && a2.success ? a2.isEnabled : "error";
+          _qi2Diag.current.readbackTries = i2 + 1;
+          if (a2 && a2.success && a2.isEnabled === t2) return a2;
+        }
+        return a2;
+      },
       _qi2QueryNow = async (e4) => {
         const t2 = _qi2Wait("0x17", 3e3);
         return await _e2.sendGetQI2StatusCommand(e4), t2;
@@ -24310,14 +24327,13 @@ const { TabPane: Xh } = yc,
         const r2 = await n2;
         _qi2Diag.current.writeStatus = r2 && r2.status !== void 0 ? r2.status : -1;
         if (!r2 || !r2.success) throw new Error("\u8BBE\u5907\u62D2\u7EDD\u4E86\u672C\u6B21\u8BBE\u7F6E");
-        const l2 = await _qi2QueryNow(e4);
-        _qi2Diag.current.readback = l2 && l2.success ? l2.isEnabled : "error";
+        const l2 = await _qi2QuerySettled(e4, t2);
         if (!l2 || !l2.success || l2.isEnabled !== t2)
           throw new Error("\u56DE\u8BFB\u72B6\u6001\u4E0E\u76EE\u6807\u4E0D\u4E00\u81F4");
         _setQi2On(t2);
       },
       _qi2Encrypted = async (e4, t2) => {
-        const helloFrame = Hh.encode("Hello", jh.CMD_HELLO),
+        const helloFrame = Hh.encode("Hello", Hh.CMD_HELLO),
           n2 = new DataView(helloFrame.buffer, helloFrame.byteOffset).getUint32(3, !0),
           r2 = _qi2Wait("0x10", 2500);
         await _e2.sendCommand(e4, helloFrame, "Hello");
@@ -24343,8 +24359,7 @@ const { TabPane: Xh } = yc,
         const p2 = await u2;
         _qi2Diag.current.writeStatus = p2 && p2.status !== void 0 ? p2.status : -1;
         if (!p2 || !p2.success) throw new Error("\u8BBE\u5907\u672A\u786E\u8BA4\u5199\u5165");
-        const m2 = await _qi2QueryNow(e4);
-        _qi2Diag.current.readback = m2 && m2.success ? m2.isEnabled : "error";
+        const m2 = await _qi2QuerySettled(e4, t2);
         if (!m2 || !m2.success || m2.isEnabled !== t2)
           throw new Error("\u56DE\u8BFB\u72B6\u6001\u4E0E\u76EE\u6807\u4E0D\u4E00\u81F4");
         _setQi2On(t2);
