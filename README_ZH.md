@@ -98,7 +98,7 @@ CREATE TABLE qi2_reports (
 ## 原项目与鸣谢
 
 - **小米官方前端**（`powerbank.mieco.net`）：页面结构、设备 HID 协议、UI 风格与基础型号数据的原始来源。所有商标与版权归小米公司所有。
-- **[yunhaocloud-collab/xiaomi-powerbank-console-WPB1026S](https://github.com/yunhaocloud-collab/xiaomi-powerbank-console-WPB1026S)**：`WPB1026S` 加密设置协议的公开实现（握手、会话密钥派生、加密载荷、回读校验），本仓库的加密写入路径参照其逻辑改写为原面板代码风格。
+- **加密设置协议参考**：因一些保护性原因无法引用。本仓库的加密写入路径参照 `WPB1026S` 加密设置协议逻辑（握手、会话密钥派生、加密载荷、回读校验）改写为原面板代码风格。
 
 本仓库的其余代码（镜像 Worker、面板改写与统计功能）为本项目整理实现，未使用上述项目之外的其他开源代码。
 
