@@ -6,7 +6,7 @@ An unofficial mirror of the Xiaomi Power Bank WebHID console, adding full **Qi2.
 
 - **Live Site (New)**: https://mirror-mieco.raycsec.com/
 - **Live Site (Legacy)**: https://mirror-mieco.nalaniflynn.cn/
-- **Architecture**: React 18 + Vite 6 front end, modular Cloudflare Worker, R2 static assets, D1 statistics, standalone report Worker
+- **Architecture**: React 18 + Vite 6 front end, modular Cloudflare Worker, R2 static assets, D1 statistics
 - **Browser Requirement**: Any desktop browser with WebHID support (Chrome, Edge, Opera, Brave, Vivaldi, Arc)
 
 > **Disclaimer**: This repository is not an official Xiaomi project and has no affiliation with or authorization from Xiaomi Corporation. For learning and research purposes only.
@@ -39,7 +39,7 @@ src/                          # React front end
   services/qi2Telemetry.js    # Report submission and statistics fetching
   i18n/                       # zh-CN / en locale packs
 worker/                       # Cloudflare Worker entry and API
-deploy/                       # deploy.mjs, upload-assets.mjs, report-worker.js, wrangler configs
+deploy/                       # deploy.mjs, upload-assets.mjs, wrangler.toml
 tests/                        # node --test suites (protocol, HID, worker, telemetry)
 docs/CHANGELOG.md             # Detailed changelog
 docs/assets/sponsor-qr.jpg    # Sponsor QR code
@@ -59,8 +59,7 @@ docs/assets/sponsor-qr.jpg    # Sponsor QR code
    CF_API_TOKEN=... node deploy/upload-assets.mjs <accountId>
    CF_API_TOKEN=... node deploy/deploy.mjs <accountId> <d1DatabaseId>
    ```
-4. Deploy the standalone report Worker (`deploy/report-worker.js` with `deploy/wrangler-report.toml`) and set its `REPORT_KEY` secret.
-5. Bind your Custom Domain in the Worker Custom Domains settings; Cloudflare issues the SSL certificate automatically.
+4. Bind your Custom Domain in the Worker Custom Domains settings; Cloudflare issues the SSL certificate automatically.
 
 ## Statistics Table Schema
 

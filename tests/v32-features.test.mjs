@@ -6,7 +6,6 @@ import assert from "node:assert/strict";
 import { HidClient } from "../src/hid/HidClient.js";
 import { MockHidTransport } from "./support/MockHidTransport.js";
 import { APP_VERSION, hashSerialHex, reportQi2Event } from "../src/services/qi2Telemetry.js";
-import reportWorker from "../deploy/report-worker.js";
 
 test("[v32] WPB1025S (modelId=19) with all-0xFF non-printable SN falls back from 0x06 to 0xE6", async () => {
   const allFfSn = new Uint8Array(20).fill(0xff);
@@ -56,19 +55,4 @@ test("[v32] qi2Telemetry posts complete v32 payload with hashed raw snBytes and 
   assert.equal(captured.body.appVersion, "v33");
   assert.equal(captured.body.snHash, await hashSerialHex(sn));
   assert.equal(captured.body.devLogs.length, 1);
-});
-
-test("[v32] deploy/report-worker.js enforces REPORT_KEY on /api/export and /download", async () => {
-  const mockDb = { prepare: () => ({ run: async () => ({}), all: async () => ({ results: [] }), bind: () => ({ all: async () => ({ results: [] }) }) }) };
-  const unauth = await reportWorker.fetch(new Request("https://report.example.com/api/export"), {
-    REPORT_KEY: "secret-key",
-    DB: mockDb,
-  });
-  assert.equal(unauth.status, 403);
-
-  const authed = await reportWorker.fetch(new Request("https://report.example.com/api/export?key=secret-key"), {
-    REPORT_KEY: "secret-key",
-    DB: mockDb,
-  });
-  assert.equal(authed.status, 200);
 });
