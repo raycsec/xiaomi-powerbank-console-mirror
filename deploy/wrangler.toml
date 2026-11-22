@@ -1,0 +1,21 @@
+name = "mirror-mieco"
+main = "../worker/index.js"
+compatibility_date = "2026-05-22"
+
+# 首次部署前替换下面的占位值，或改用 wrangler d1 / r2 命令创建后回填。
+[[d1_databases]]
+binding = "DB"
+database_name = "mirror-mieco"
+database_id = "<D1_DATABASE_ID>"
+
+[[r2_buckets]]
+binding = "XIAOMI_MIRROR"
+bucket_name = "xiaomi-mirror"
+
+# 密钥不要写进本文件，使用命令写入：
+#   wrangler secret put SECRET_KEY
+#   wrangler secret put AGREE_SECRET_KEY
+
+[[routes]]
+pattern = "mirror-mieco.example.com"
+custom_domain = true
