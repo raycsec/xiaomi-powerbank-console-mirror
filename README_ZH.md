@@ -5,7 +5,7 @@
 基于小米官方移动电源详情页的可用镜像，补全了 Qi2.2 的**开启 / 关闭**能力，兼容旧版明文与新版加密协议。
 
 - **在线站点（新）**：https://mirror-mieco.raycsec.com/
-- **在线站点（旧）**：https://mirror-mieco.nalaniflynn.cn/
+- **在线站点（旧）**：https://mirror-mieco.nalaniflynn.cn/ —— **该域名将在几个月后到期且不再续费，请改用上面的新站点**
 - **项目架构**：React 18 + Vite 6 前端，模块化 Cloudflare Worker，R2 静态资源，D1 统计
 - **运行要求**：支持 WebHID 的桌面浏览器（Chrome、Edge、Opera、Brave、Vivaldi、Arc）
 
