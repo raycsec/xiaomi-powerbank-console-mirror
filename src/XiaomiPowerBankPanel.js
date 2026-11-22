@@ -22914,6 +22914,20 @@ const __qlog = {
     if (this.lines.length > 400) this.lines.splice(0, this.lines.length - 400);
     this.emit();
   },
+  mark() {
+    return this.lines.length;
+  },
+  from(mark) {
+    const start = typeof mark === "number" && mark >= 0 ? Math.max(0, mark) : Math.max(0, this.lines.length - 120);
+    return this.lines.slice(start).map((e) => ({
+      seq: e.seq,
+      t: e.t,
+      kind: e.kind,
+      label: e.label,
+      hex: e.hex,
+      extra: e.extra,
+    }));
+  },
   dump() {
     return this.lines.slice(-120).map((e) => ({
       seq: e.seq,
@@ -24091,7 +24105,7 @@ const { TabPane: Xh } = yc,
       ze2 = It.useRef(null),
       He2 = It.useRef(null),
       je2 = It.useRef(null),
-      _qi2AppVersion = "v26",
+      _qi2AppVersion = "v32",
       _qi2Model = (e4) =>
         _qi2FindModel(e4) || {
           id: null,
@@ -24365,7 +24379,7 @@ const { TabPane: Xh } = yc,
           throw new Error("\u56DE\u8BFB\u72B6\u6001\u4E0E\u76EE\u6807\u4E0D\u4E00\u81F4");
         _setQi2On(t2);
       },
-      _qi2Report = (e4, t2, o2) => {
+      _qi2Report = (e4, t2, o2, _mark) => {
         try {
           console.log("[QI2] report action=" + (e4 ? "on" : "off") + " ok=" + !!t2 + " detail=" + o2);
         } catch (e) {}
@@ -24395,7 +24409,7 @@ const { TabPane: Xh } = yc,
                   pageUrl: (function () { try { return location.origin + location.pathname; } catch (e) { return ""; } })(),
                   ok: !!t2,
                   detail: String(o2 || "").slice(0, 400),
-                  devLogs: __qlog.dump(),
+                  devLogs: __qlog.from(_mark),
                   info: Object.assign({}, _qi2Diag.current, {
                     batteryModel: le2 && le2.batteryModel,
                     batteryCode: le2 && le2.batteryCode,
@@ -24411,14 +24425,15 @@ const { TabPane: Xh } = yc,
       _qi2Trial = async () => {
         if (!V2 || _qi2Lock.current) return;
         __qlog.setEnabled(!0);
+        const _flowMark = __qlog.mark();
         _qi2Lock.current = !0;
         _setQi2Busy(!0);
         try {
           await _qi2Encrypted(V2, !0);
-          _qi2Report(!0, !0, "trial");
+          _qi2Report(!0, !0, "trial", _flowMark);
           setTimeout(() => _qi2Fetch(), 800);
         } catch (e4) {
-          _qi2Report(!0, !1, (e4 && e4.message) || "trial-failed");
+          _qi2Report(!0, !1, (e4 && e4.message) || "trial-failed", _flowMark);
           ju.error({
             title: "QI 2.2 \u6D4B\u8BD5",
             content: (e4 && e4.message) || "\u6D4B\u8BD5\u5931\u8D25",
@@ -24430,6 +24445,7 @@ const { TabPane: Xh } = yc,
       _qi2Apply = async (e4) => {
         if (!(!V2 || _qi2Lock.current)) {
           (_qi2Lock.current = !0), _setQi2Busy(!0);
+          const _flowMark = __qlog.mark();
           try {
             const t2 = _qi2Model(De2.current),
               _preferEnc = !!(t2 && t2.qi2NewProtocol),
@@ -24444,10 +24460,10 @@ const { TabPane: Xh } = yc,
                 if (_mode === "encrypted") await _qi2Encrypted(V2, !!e4);
                 else await _qi2Legacy(V2, !!e4);
                 if (_mode === "encrypted" && !_done && _order[0] !== "encrypted")
-                  _qi2Report(!!e4, true, "encrypted-fallback");
+                  _qi2Report(!!e4, true, "encrypted-fallback", _flowMark);
                 else if (_mode === "legacy" && _order[0] !== "legacy")
-                  _qi2Report(!!e4, true, "legacy-fallback");
-                else _qi2Report(!!e4, true, _mode);
+                  _qi2Report(!!e4, true, "legacy-fallback", _flowMark);
+                else _qi2Report(!!e4, true, _mode, _flowMark);
                 _done = !0;
                 try {
                   console.log("[QI2] " + _mode + " succeeded");
@@ -24473,7 +24489,7 @@ const { TabPane: Xh } = yc,
             }
           } catch (t2) {
             (_qi2Lock.current = !1), _setQi2Busy(!1),
-              _qi2Report(!!e4, false, (t2 && t2.message) || "unknown"),
+              _qi2Report(!!e4, false, (t2 && t2.message) || "unknown", _flowMark),
               _setQi2Busy(!1),
               ju.error({
                 title: "QI 2.2",

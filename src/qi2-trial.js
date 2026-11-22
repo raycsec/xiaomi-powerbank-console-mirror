@@ -1,4 +1,4 @@
-const APP_VERSION = window.__MIECO_APP_VERSION || "v30";
+const APP_VERSION = window.__MIECO_APP_VERSION || "v32";
 const HEAD = 165;
 const FRAME_SIZE = 32;
 const CMD = { HELLO: 0x00, BATT: 0x01, QI2_GET: 0x07, QI2_SET: 0x06, ENC: 0xE6, R_HELLO: 0x10, R_BATT: 0x11, R_QI2_GET: 0x17, R_QI2_SET: 0x16, R_ENC: 0xF6, ECHO: 0xFE };
@@ -138,6 +138,7 @@ async function run(target) {
   }
   setStatus("正在握手…", "#2563eb");
   await picked.open();
+  const flowStart = entries.length;
   push("INFO", "device", null, { productName: picked.productName, vendorId: picked.vendorId, productId: picked.productId, target });
   const waiters = [];
   const onReport = (event) => {
@@ -189,8 +190,35 @@ async function run(target) {
     }
     return last;
   };
+  const report = async (ok, detail, extra) => {
+    try {
+      const seed = snBytesForReport.length
+        ? snBytesForReport
+        : new TextEncoder().encode(modelNameForReport + ":" + picked.productId);
+      const snHash = await sha16(seed);
+      await fetch("/api/qi2-report", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          model: modelNameForReport.toUpperCase(),
+          snHash,
+          action: target ? "on" : "off",
+          appVersion: APP_VERSION,
+          reportedAt: new Date().toISOString(),
+          pageUrl: location.origin + location.pathname,
+          ok,
+          detail,
+          info: Object.assign({ protocol: "trial", target, flowEntries: entries.length - flowStart }, extra || {}),
+          devLogs: entries.slice(flowStart),
+        }),
+      });
+    } catch (e) {}
+  };
 
   let modelName = "GENERIC";
+  let snBytesForReport = new Uint8Array(0);
+  let modelNameForReport = "GENERIC";
   try {
     const helloFrame = buildHello();
     const helloWait = wait(CMD.R_HELLO, 2500);
@@ -205,9 +233,12 @@ async function run(target) {
       modelDec = p[0] | (p[1] << 8);
       snBytes = new Uint8Array(p.subarray(2, 22));
       modelName = MODEL_NAMES[modelDec] || "ID_" + modelDec;
+      snBytesForReport = snBytes;
+      modelNameForReport = modelName;
       push("INFO", "hello", null, { modelDec, modelName, snLen: snBytes.length, snHex: hex(snBytes) });
     } else {
       modelName = "ECHO_" + (picked.productId || 0).toString(16).toUpperCase();
+      modelNameForReport = modelName;
       push("WARN", "hello", null, { note: hello ? "设备未返回设备信息（" + hello.command + "），仅尝试明文路径" : "未收到 Hello 响应，仅尝试明文路径" });
     }
 
@@ -218,6 +249,11 @@ async function run(target) {
     if (before.isEnabled === target) {
       const msg = target ? "已经是开启状态，无需写入" : "已经是关闭状态，无需写入";
       push("INFO", "result", null, { ok: true, skipped: true, message: msg });
+      await report(true, "trial-skipped-already-" + (target ? "on" : "off"), {
+        skipped: true,
+        statusCode: before.statusCode,
+        readback: before.isEnabled,
+      });
       setStatus(msg, "#15803D");
       return;
     }
@@ -276,30 +312,24 @@ async function run(target) {
     const after = await querySettled(target);
     const ok = !!after && after.statusCode === 0 && after.isEnabled === target;
 
-    try {
-      const snHash = await sha16(snBytes.length ? snBytes : new TextEncoder().encode(modelName + ":" + picked.productId));
-      await fetch("/api/qi2-report", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({
-          model: modelName.toUpperCase(),
-          snHash,
-          action: target ? "on" : "off",
-          appVersion: APP_VERSION,
-          reportedAt: new Date().toISOString(),
-          pageUrl: location.origin + location.pathname,
-          ok,
-          detail: ok ? "trial-" + usedPath + "-ok" : "trial-" + usedPath + "-readback-mismatch",
-          info: { protocol: "trial:" + usedPath, modelDec, health, cycles, chgState, fault, writeStatus, readback: after ? after.isEnabled : "error" },
-          devLogs: entries,
-        }),
-      });
-    } catch (e) {}
+    await report(ok, ok ? "trial-" + usedPath + "-ok" : "trial-" + usedPath + "-readback-mismatch", {
+      modelDec,
+      health,
+      cycles,
+      chgState,
+      fault,
+      writeStatus,
+      usedPath,
+      readback: after ? after.isEnabled : "error",
+    });
 
     setStatus(ok ? (target ? "尝试成功：已开启 QI 2.2" : "尝试成功：已关闭 QI 2.2") : "尝试完成但回读不一致", ok ? "#15803D" : "#b45309");
   } catch (err) {
     push("ERROR", "exception", null, { message: String((err && err.message) || err) });
+    await report(false, "trial-exception: " + String((err && err.message) || err), {
+      stage: "exception",
+      modelDec: -1,
+    });
     setStatus("尝试失败：" + String((err && err.message) || err), "#dc2626");
   } finally {
     picked.removeEventListener("inputreport", onReport);
