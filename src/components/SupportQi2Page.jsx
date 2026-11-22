@@ -3,6 +3,7 @@ import { getQi2ModelGroups } from "../config/models.js";
 import { useI18n } from "../context/I18nContext.jsx";
 import { HidClient } from "../hid/HidClient.js";
 import { WebHidTransport } from "../hid/WebHidTransport.js";
+import { AUTO_REFRESH_MS } from "../protocol/constants.js";
 import { fetchQi2Stats, reportQi2Event } from "../services/qi2Telemetry.js";
 
 export default function SupportQi2Page() {
@@ -15,11 +16,21 @@ export default function SupportQi2Page() {
 
   useEffect(() => {
     const models = [...groups.supported, ...groups.experimental].map((m) => m.model);
-    Promise.all(models.map(async (model) => [model, await fetchQi2Stats(model)])).then((entries) => {
-      const next = {};
-      for (const [m, st] of entries) if (st) next[m] = st;
-      setStatsMap(next);
-    });
+    let cancelled = false;
+    const loadStats = () => {
+      Promise.all(models.map(async (model) => [model, await fetchQi2Stats(model)])).then((entries) => {
+        if (cancelled) return;
+        const next = {};
+        for (const [m, st] of entries) if (st) next[m] = st;
+        setStatsMap(next);
+      });
+    };
+    loadStats();
+    const timer = setInterval(loadStats, AUTO_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
   const runTrial = async (targetEnabled) => {
