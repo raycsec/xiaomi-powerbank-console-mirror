@@ -23,6 +23,7 @@ export function usePowerBank() {
   const logsRef = useRef([]);
   const helloRef = useRef(null);
   const qi2BusyRef = useRef(false);
+  const refreshBusyRef = useRef(false);
 
   const appendLog = useCallback((entry) => {
     const next = [...logsRef.current.slice(-299), entry];
@@ -221,8 +222,13 @@ export function usePowerBank() {
     if (status !== "connected") return undefined;
     const timer = setInterval(() => {
       const client = clientRef.current;
-      if (!client || qi2BusyRef.current) return;
-      void refreshAll(client, helloRef.current).catch(() => undefined);
+      if (!client || qi2BusyRef.current || refreshBusyRef.current) return;
+      refreshBusyRef.current = true;
+      void refreshAll(client, helloRef.current)
+        .catch(() => undefined)
+        .finally(() => {
+          refreshBusyRef.current = false;
+        });
     }, AUTO_REFRESH_MS);
     return () => clearInterval(timer);
   }, [refreshAll, status]);
