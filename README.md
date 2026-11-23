@@ -9,7 +9,7 @@
 An unofficial mirror of the Xiaomi Power Bank WebHID console, adding full **Qi2.2 on/off** control across both legacy and encrypted protocols.
 
 - **Live Site (New)**: https://mirror-mieco.raycsec.com/
-- **Live Site (Legacy)**: https://mirror-mieco.nalaniflynn.cn/
+- **Live Site (Legacy)**: https://mirror-mieco.nalaniflynn.cn/ — **this domain expires in a few months and will not be renewed, please use the new site instead**
 - **Architecture**: Single-file Cloudflare Worker + R2 static assets
 - **Browser Requirement**: Desktop Chrome (WebHID supported)
 
