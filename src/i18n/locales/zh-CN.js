@@ -109,6 +109,7 @@ export default {
   "support_qi2_subtitle": "查看各机型支持情况",
   "support_qi2_group_supported": "已支持",
   "support_qi2_group_experimental": "实验性支持",
+  "support_qi2_experimental_note": "目前仍在测试和研究中，此功能可能不可用。",
   "support_qi2_group_unsupported": "硬件支持 · 未适配",
   "support_qi2_trial_title": "实验性开启测试",
   "support_qi2_trial_warn": "",

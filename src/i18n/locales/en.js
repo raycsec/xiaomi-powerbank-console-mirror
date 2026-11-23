@@ -109,6 +109,7 @@ export default {
   "support_qi2_subtitle": "Model compatibility overview",
   "support_qi2_group_supported": "Supported",
   "support_qi2_group_experimental": "Experimental",
+  "support_qi2_experimental_note": "Testing and research are ongoing; this feature may not work.",
   "support_qi2_group_unsupported": "Hardware Supported · Not Adapted",
   "support_qi2_trial_title": "Experimental Enable Test",
   "support_qi2_trial_warn": "",
