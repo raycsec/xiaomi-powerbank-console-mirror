@@ -81,7 +81,7 @@ export default {
   "qi2_card_title_off": "Qi2.2 Available",
   "qi2_card_desc_on": "Qi2.2 is enabled for 25W wireless fast charging (actual power depends on phone, charge level, and temperature).",
   "qi2_card_desc_off": "Enable for 25W wireless fast charging.",
-  "qi2_card_experimental_tip": "This model may support Qi2.2 but has not been tested on this exact model; firmware differences may prevent enabling.",
+  "qi2_card_experimental_tip": "This model may support Qi2.2 but has not been tested on this exact model; firmware differences may prevent enabling. Testing and research are ongoing, and this feature may not work.",
   "qi2_card_unsupported_title": "Hardware Supported · Not Adapted",
   "qi2_card_unsupported_desc": "Not supported yet.",
   "qi2_btn_enable": "Enable",

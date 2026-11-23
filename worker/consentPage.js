@@ -77,6 +77,7 @@ export function renderConsentPage({ scriptNonce, csrfToken, challenge, challenge
     <input type="hidden" id="pt_m" value="${pageToken}" />
     <input type="hidden" id="is_cn" value="${isCN ? "1" : "0"}" />
     <div style="font-size:14px;color:#374151;line-height:1.6;">
+      <p>此快照版本修改了部分设备qi2.2开启和关闭功能的相关配置。</p>
       <p>此网站用于充电宝信息查看和qi2.2的配置关闭。此网页不会更改充电宝和设备固件，不会使用非官方接口，不会影响充电宝的安全性。如遇问题，请长按充电宝电源键重置系统。</p>
       <p style="color:#dc2626;font-size:16px;font-weight:800;text-decoration:underline;text-underline-offset:4px;line-height:1.7;background:#fef2f2;padding:14px;border-radius:8px;border:1px solid #fecaca;word-break:break-word;">
         qi2.2功能在中国大陆境内<strong style="color:#ea580c;font-size:18px;font-weight:900;">不被允许</strong>使用 如果开启可能影响航空器安全 <strong style="color:#ea580c;font-size:18px;font-weight:900;">请勿</strong>在中国大陆境内/注册于中国大陆航司的航空器上开启或使用此功能 此功能仅可在qi2.2所使用的360khz合法的地区可使用及开启 在非法区域或非无线电屏蔽环境内<strong style="color:#ea580c;font-size:18px;font-weight:900;">禁止</strong>开启，如开启请<strong style="color:#ea580c;font-size:18px;font-weight:900;">立即</strong>重置充电宝或关闭此配置项

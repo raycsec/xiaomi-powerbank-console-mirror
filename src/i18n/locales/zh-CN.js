@@ -81,7 +81,7 @@ export default {
   "qi2_card_title_off": "此设备可开启 Qi2.2 功能",
   "qi2_card_desc_on": "当前设备已回报 Qi2.2 开启，支持 25W 无线快充（实际功率取决于手机、电量与温度）。",
   "qi2_card_desc_off": "开启后将支持 25W 无线快充。",
-  "qi2_card_experimental_tip": "该型号可能支持 Qi2.2，未经该型号实机测试，固件差异可能导致无法开启。",
+  "qi2_card_experimental_tip": "该型号可能支持 Qi2.2，未经该型号实机测试，固件差异可能导致无法开启。目前仍在测试和研究中，此功能可能不可用。",
   "qi2_card_unsupported_title": "硬件支持 · 开启方式未适配",
   "qi2_card_unsupported_desc": "暂不支持开启。",
   "qi2_btn_enable": "立即开启",
