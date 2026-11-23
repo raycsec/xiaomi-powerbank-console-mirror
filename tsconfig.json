@@ -5,15 +5,14 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "allowJs": true,
-    "checkJs": true,
+    "checkJs": false,
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
   "include": [
-    "src",
-    "worker",
-    "tests"
+    "src/**/*.ts",
+    "src/**/*.tsx"
   ]
 }

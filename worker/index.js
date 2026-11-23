@@ -35,6 +35,10 @@ const MIME_MAP = {
 
 const ALLOWED_PAGE_ROUTES = new Set(["/", "/models", "/supportqi2", "/exception-guide"]);
 
+/**
+ * @param {Headers} headers
+ * @param {string|null} [nonce]
+ */
 function applySecurityHeaders(headers, nonce = null) {
   headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   headers.set("X-Content-Type-Options", "nosniff");
