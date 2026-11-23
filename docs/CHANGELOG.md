@@ -18,7 +18,7 @@
 - 协议模块重组为 `codec.js`、`qi2Crypto.js`、`cellIdentity.js`；电芯编码库补全 25 家厂商与 35 组型号。
 - 本仓库只发布公开功能，内部测试相关内容不在开源版本中。
 
-## v32 重构版本（2026/10/15 20:00:46）— 协议完全对齐、国内加速与测试站隔离版
+## v32 重构版本（2026/10/15 20:00:46）— 协议完全对齐与国内加速版
 
 ### 1. 协议层全面对齐官方规范
 - **Hello 序列号动态截取与清洗**：`decodeHelloResponse` 改为动态截取 `payload.slice(2, payload.length - 1)`，完整支持 23B（20B SN）与 27B（24B SN，如 `WPB0525S`）；`qi2Crypto.js` 对常规 ASCII 序列号按首个 `0x00` 截断并去除首尾空白，无可见 ASCII 时自动回退原始 `snBytes` 并在界面显示 `HEX:` 格式；放宽 `health <= 0xFFFF`。
