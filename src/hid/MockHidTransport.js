@@ -1,35 +1,36 @@
-import { CMD, FRAME_HEAD, HID_FRAME_SIZE, RESP } from "../../src/protocol/constants.js";
-import { calculateCrc8 } from "../../src/protocol/crc8.js";
-import { parseFrame } from "../../src/protocol/frames.js";
-import { buildEncryptedQi2Payload } from "../../src/protocol/qi2Ccm.js";
+import { CMD, FRAME_HEAD, RESP } from "../protocol/constants.js";
+import { calculateCrc8, parseFrame } from "../protocol/codec.js";
+import { buildEncryptedQi2Payload } from "../protocol/qi2Crypto.js";
 
 function makeResponseFrame(cmd, payload) {
-  const body = new Uint8Array(3 + payload.length);
-  body[0] = FRAME_HEAD;
-  body[1] = cmd;
-  body[2] = payload.length;
-  body.set(payload, 3);
-  const out = new Uint8Array(HID_FRAME_SIZE);
-  out.set(body);
-  out[body.length] = calculateCrc8(body);
+  const out = new Uint8Array(4 + payload.length);
+  out[0] = FRAME_HEAD;
+  out[1] = cmd;
+  out[2] = payload.length;
+  out.set(payload, 3);
+  out[3 + payload.length] = calculateCrc8(out.subarray(0, 3 + payload.length));
   return out;
 }
 
 export class MockHidTransport {
   constructor(config = {}) {
     this.kind = "demo";
-    this.modelId = config.modelId ?? 16; // 默认 WPB1026S
-    this.serial = config.serial ?? "DMPB1026S0001";
-    this.snBytes = config.snBytes ?? new TextEncoder().encode(this.serial.padEnd(20, "\0").slice(0, 20));
-    this.helloPayloadLength = config.helloPayloadLength ?? 23;
+    this.modelId = config.modelId ?? 16;
+    this.helloPayloadLength = config.helloPayloadLength ?? (this.modelId === 10 ? 27 : 23);
+    const snAreaLen = this.helloPayloadLength - 3;
+    this.serial = config.serial ?? (this.modelId === 10 ? "DMPB0525S202600000012345" : "DMPB1026S0001");
+    this.snBytes =
+      config.snBytes ??
+      new TextEncoder().encode(this.serial.padEnd(snAreaLen, "\0").slice(0, snAreaLen));
     this.echoOnHello = config.echoOnHello ?? false;
     this.acceptLegacyQi2 = config.acceptLegacyQi2 ?? (this.modelId === 9 || this.modelId === 19);
-    this.acceptEncryptedQi2 = config.acceptEncryptedQi2 ?? this.modelId === 16;
+    this.acceptEncryptedQi2 = config.acceptEncryptedQi2 ?? (this.modelId === 16 || this.modelId === 10);
     this.readbackDelayReads = config.readbackDelayReads ?? 0;
     this.fakeWriteSuccess = config.fakeWriteSuccess ?? false;
     this.dropResponseCommands = new Set(config.dropResponseCommands ?? []);
     this.responseDelayMs = config.responseDelayMs ?? 0;
     this.onBeforeCommand = config.onBeforeCommand ?? null;
+    this.customCommandHandler = config.customCommandHandler ?? null;
 
     this.state = {
       qi2Enabled: config.qi2Enabled ?? false,
@@ -38,12 +39,15 @@ export class MockHidTransport {
       health: config.health ?? 97,
       cycleCount: config.cycleCount ?? 37,
       faultType: config.faultType ?? 0,
-      chargeState: config.chargeState ?? 1, // 充电中
+      errorValue: config.errorValue ?? 0,
+      historyErrorCount: config.historyErrorCount ?? 2,
+      chargeState: config.chargeState ?? 1,
       level: config.level ?? 86,
       temperature: config.temperature ?? 30,
       voltage: config.voltage ?? 7700,
       current: config.current ?? 1190,
-      cellCount: config.cellCount ?? 2,
+      series: config.series ?? 1,
+      parallel: config.parallel ?? (config.cellCount ?? 2),
       lastHelloTimestamp: 0,
     };
 
@@ -86,11 +90,8 @@ export class MockHidTransport {
       if (!this.opened) return;
       for (const cb of this.reportListeners) cb(frame);
     };
-    if (this.responseDelayMs > 0) {
-      setTimeout(fire, this.responseDelayMs);
-    } else {
-      queueMicrotask(fire);
-    }
+    if (this.responseDelayMs > 0) setTimeout(fire, this.responseDelayMs);
+    else queueMicrotask(fire);
   }
 
   async send(frame) {
@@ -98,12 +99,9 @@ export class MockHidTransport {
     const parsed = parseFrame(frame);
     if (!parsed || !parsed.crcValid) throw new Error("Invalid outgoing frame");
     this.sentFrames.push(parsed);
-    if (this.onBeforeCommand) {
-      await this.onBeforeCommand(parsed, this);
-    }
-    if (!this.opened || this.dropResponseCommands.has(parsed.command)) {
-      return;
-    }
+    if (this.onBeforeCommand) await this.onBeforeCommand(parsed, this);
+    if (!this.opened || this.dropResponseCommands.has(parsed.command)) return;
+    if (this.customCommandHandler && (await this.customCommandHandler(parsed, this, makeResponseFrame))) return;
 
     switch (parsed.command) {
       case CMD.HELLO: {
@@ -113,9 +111,10 @@ export class MockHidTransport {
           return;
         }
         const payload = new Uint8Array(this.helloPayloadLength);
+        const snAreaLen = this.helloPayloadLength - 3;
         payload[0] = this.modelId & 0xff;
         payload[1] = (this.modelId >> 8) & 0xff;
-        payload.set(this.snBytes.slice(0, 20), 2);
+        payload.set(this.snBytes.slice(0, snAreaLen), 2);
         payload[payload.length - 1] = this.state.chargeState;
         this.emit(makeResponseFrame(RESP.HELLO, payload));
         return;
@@ -130,23 +129,33 @@ export class MockHidTransport {
         p[4] = this.state.health & 0xff;
         p[5] = (this.state.health >> 8) & 0xff;
         p[6] = ((this.state.chargeState & 0x03) << 6) | (this.state.faultType & 0x3f);
-        p[7] = 0;
-        p[8] = 2; // history count
-        p[9] = 0;
-        p[10] = this.state.cellCount;
-        p[11] = this.state.level;
-        p[12] = this.state.temperature & 0xff;
-        p[13] = this.state.voltage & 0xff;
-        p[14] = (this.state.voltage >> 8) & 0xff;
+        p[7] = this.state.errorValue & 0xff;
+        p[8] = (this.state.errorValue >> 8) & 0xff;
+        p[9] = this.state.historyErrorCount & 0xff;
+        p[10] = (this.state.historyErrorCount >> 8) & 0xff;
+        p[11] = ((this.state.series & 0x0f) << 4) | (this.state.parallel & 0x0f);
+        p[12] = this.state.level;
+        p[13] = this.state.temperature & 0xff;
+        p[14] = this.state.voltage & 0xff;
+        p[15] = (this.state.voltage >> 8) & 0xff;
         const cur = this.state.current < 0 ? 0x10000 + this.state.current : this.state.current;
-        p[15] = cur & 0xff;
-        p[16] = (cur >> 8) & 0xff;
+        p[16] = cur & 0xff;
+        p[17] = (cur >> 8) & 0xff;
         this.emit(makeResponseFrame(RESP.BATTERY_INFO, p));
         return;
       }
 
       case CMD.GET_CELL_STATUS: {
-        const p = new Uint8Array([0, 2, 1, 0x0a, 0x0f, 29, 2, 0x0a, 0x0f, 30]); // 3850mV each
+        // 0x12: status(1B) + 2 cells * 5B (tempC:int8, voltageMV:int16LE, currentMA:int16LE)
+        const p = new Uint8Array(1 + 10);
+        const dv = new DataView(p.buffer);
+        p[0] = 0;
+        p[1] = 29;
+        dv.setInt16(2, 3850, true);
+        dv.setInt16(4, 595, true);
+        p[6] = 30;
+        dv.setInt16(7, 3852, true);
+        dv.setInt16(9, 595, true);
         this.emit(makeResponseFrame(RESP.CELL_STATUS, p));
         return;
       }
@@ -155,46 +164,48 @@ export class MockHidTransport {
         const cellIdx = parsed.payload[0] || 1;
         const idStr = cellIdx === 1 ? "ATLNDAG3F-1D9A26A0123" : "LWN2AFG3F-1MFH26B0456";
         const bytes = new TextEncoder().encode(idStr);
-        const p = new Uint8Array(1 + bytes.length);
-        p[0] = cellIdx;
-        p.set(bytes, 1);
+        const p = new Uint8Array(30);
+        p[0] = 0;
+        p[1] = cellIdx;
+        p.set(bytes.slice(0, 28), 2);
         this.emit(makeResponseFrame(RESP.BATTERY_ID, p));
         return;
       }
 
       case CMD.GET_CELL_TEMP_MODEL: {
         const modelBytes = new TextEncoder().encode("436678N");
-        const p = new Uint8Array(3 + modelBytes.length);
+        const p = new Uint8Array(5 + modelBytes.length);
+        const dv = new DataView(p.buffer);
         p[0] = 0;
-        p[1] = 236; // -20C
-        p[2] = 60;  // +60C
-        p.set(modelBytes, 3);
+        dv.setInt16(1, 60, true);
+        dv.setInt16(3, -20, true);
+        p.set(modelBytes, 5);
         this.emit(makeResponseFrame(RESP.CELL_TEMP_MODEL, p));
         return;
       }
 
       case CMD.GET_HISTORY: {
-        const p = new Uint8Array(2 + 16);
-        p[0] = 0;
-        p[1] = 2;
+        const p = new Uint8Array(1 + 16);
         const dv = new DataView(p.buffer);
-        dv.setUint32(2, 1775000000, true);
-        p[6] = 5; // charge high temp
-        p[7] = 1;
-        dv.setInt16(8, 56, true);
-        dv.setUint32(10, 1770000000, true);
-        p[14] = 1; // overvoltage
-        p[15] = 2;
-        dv.setInt16(16, 4450, true);
+        p[0] = 0;
+        // Record 1: charging high temp 56°C at UTC+8 timestamp
+        dv.setUint32(1, 1775000000 + 28800, true);
+        p[5] = 1;
+        p[6] = 64 | 3;
+        dv.setUint16(7, 56, true);
+        // Record 2: cell 2 overvoltage 4450mV -> 4.45 V
+        dv.setUint32(9, 1770000000 + 28800, true);
+        p[13] = 2;
+        p[14] = 0 | 1;
+        dv.setUint16(15, 4450, true);
         this.emit(makeResponseFrame(RESP.HISTORY, p));
         return;
       }
 
       case CMD.GET_QI2_STATUS: {
         if (this.state.pendingQi2Enabled !== null) {
-          if (this.state.remainingDelayReads > 0) {
-            this.state.remainingDelayReads -= 1;
-          } else {
+          if (this.state.remainingDelayReads > 0) this.state.remainingDelayReads -= 1;
+          else {
             this.state.qi2Enabled = this.state.pendingQi2Enabled;
             this.state.pendingQi2Enabled = null;
           }

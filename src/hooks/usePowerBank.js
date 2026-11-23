@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HidClient } from "../hid/HidClient.js";
 import { WebHidTransport } from "../hid/WebHidTransport.js";
-import { AUTO_REFRESH_MS, TIMEOUT_MS } from "../protocol/constants.js";
+import { TIMEOUT_MS } from "../protocol/constants.js";
 import { reportQi2Event } from "../services/qi2Telemetry.js";
+
+const AUTO_REFRESH_INTERVAL_MS = 3000;
 
 export function usePowerBank() {
   const [status, setStatus] = useState("idle");
@@ -20,10 +22,11 @@ export function usePowerBank() {
 
   const clientRef = useRef(null);
   const workerRef = useRef(null);
+  const pollTimerRef = useRef(null);
   const logsRef = useRef([]);
-  const helloRef = useRef(null);
+  const refreshingRef = useRef(false);
   const qi2BusyRef = useRef(false);
-  const refreshBusyRef = useRef(false);
+  const lastHistoryCountRef = useRef(-1);
 
   const appendLog = useCallback((entry) => {
     const next = [...logsRef.current.slice(-299), entry];
@@ -31,61 +34,29 @@ export function usePowerBank() {
     setLogs(next);
   }, []);
 
-  const stopHeartbeat = useCallback(() => {
+  const stopBackgroundTasks = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
     if (workerRef.current) {
       workerRef.current.postMessage({ type: "stop" });
       workerRef.current.terminate();
       workerRef.current = null;
     }
+    refreshingRef.current = false;
   }, []);
 
-  const startHeartbeat = useCallback((client) => {
-    stopHeartbeat();
-    if (typeof Worker === "undefined") return;
-    const worker = new Worker(new URL("../workers/heartbeat.worker.js", import.meta.url), { type: "module" });
-    worker.onmessage = () => {
-      void client.sendHeartbeat();
-    };
-    worker.postMessage({ type: "start", interval: TIMEOUT_MS.HEARTBEAT_INTERVAL });
-    workerRef.current = worker;
-  }, [stopHeartbeat]);
-
-  const refreshAll = useCallback(async (client, helloInfo) => {
-    const batt = await client.getBatteryInfo();
-    setBattery(batt);
-
-    const cellList = batt.cellCount > 0 ? await client.getCellStatus(batt.cellCount) : [];
+  const applyCellSensorMask = (cellList, helloInfo) => {
     const maxSensors = helloInfo?.modelConfig?.display?.maxTemperatureSensors;
-    setCells(
-      maxSensors != null
-        ? cellList.map((c, idx) => (idx < maxSensors ? c : { ...c, hasTemperatureSensor: false, temperature: null }))
-        : cellList,
-    );
+    return maxSensors != null
+      ? cellList.map((c, idx) => (idx < maxSensors ? c : { ...c, hasTemperatureSensor: false, temperature: null }))
+      : cellList;
+  };
 
-    if (helloInfo?.modelConfig?.capabilities?.supportsTempModelQuery) {
-      try {
-        setTempModel(await client.getTempModel());
-      } catch {
-        setTempModel(null);
-      }
-    }
-
-    const ids = {};
-    for (let i = 1; i <= Math.min(batt.cellCount, 8); i += 1) {
-      try {
-        ids[i] = await client.getBatteryId(i);
-      } catch {}
-    }
-    setCellIds(ids);
-
-    if (helloInfo?.modelConfig?.capabilities?.qi2?.mode !== "none") {
-      try {
-        setQi2Status(await client.getQi2Status());
-      } catch {
-        setQi2Status(null);
-      }
-    }
-
+  const fetchHistoryIfNeeded = useCallback(async (client, batt, helloInfo, force = false) => {
+    if (!force && batt.historyErrorCount === lastHistoryCountRef.current) return;
+    lastHistoryCountRef.current = batt.historyErrorCount;
     if (batt.historyErrorCount > 0) {
       const minTs = helloInfo?.modelConfig?.capabilities?.historyMinTimestamp ?? 0;
       const all = [];
@@ -100,17 +71,87 @@ export function usePowerBank() {
     }
   }, []);
 
+  const refreshLive = useCallback(async (client, helloInfo) => {
+    if (!client?.opened || refreshingRef.current || qi2BusyRef.current) return;
+    refreshingRef.current = true;
+    try {
+      const batt = await client.getBatteryInfo();
+      setBattery(batt);
+      const cellList = batt.cellCount > 0 ? await client.getCellStatus(batt.cellCount) : [];
+      setCells(applyCellSensorMask(cellList, helloInfo));
+      await fetchHistoryIfNeeded(client, batt, helloInfo, false);
+    } catch {
+      // Transient polling errors are ignored; physical disconnect triggers onDisconnect.
+    } finally {
+      refreshingRef.current = false;
+    }
+  }, [fetchHistoryIfNeeded]);
+
+  const loadInitialSnapshot = useCallback(async (client, helloInfo) => {
+    refreshingRef.current = true;
+    try {
+      const batt = await client.getBatteryInfo();
+      setBattery(batt);
+
+      const cellList = batt.cellCount > 0 ? await client.getCellStatus(batt.cellCount) : [];
+      setCells(applyCellSensorMask(cellList, helloInfo));
+
+      if (helloInfo?.modelConfig?.capabilities?.supportsTempModelQuery) {
+        try {
+          setTempModel(await client.getTempModel());
+        } catch {
+          setTempModel(null);
+        }
+      }
+
+      const ids = {};
+      for (let i = 1; i <= Math.min(batt.cellCount, 8); i += 1) {
+        try {
+          ids[i] = await client.getBatteryId(i);
+        } catch {}
+      }
+      setCellIds(ids);
+
+      if (helloInfo?.modelConfig?.capabilities?.qi2?.mode !== "none") {
+        try {
+          setQi2Status(await client.getQi2Status());
+        } catch {
+          setQi2Status(null);
+        }
+      }
+
+      await fetchHistoryIfNeeded(client, batt, helloInfo, true);
+    } finally {
+      refreshingRef.current = false;
+    }
+  }, [fetchHistoryIfNeeded]);
+
+  const startBackgroundTasks = useCallback((client, helloInfo) => {
+    stopBackgroundTasks();
+    if (typeof Worker !== "undefined") {
+      const worker = new Worker(new URL("../workers/heartbeat.worker.js", import.meta.url), { type: "module" });
+      worker.onmessage = () => {
+        if (!qi2BusyRef.current && client.opened) void client.sendHeartbeat();
+      };
+      worker.postMessage({ type: "start", interval: TIMEOUT_MS.HEARTBEAT_INTERVAL });
+      workerRef.current = worker;
+    }
+    pollTimerRef.current = setInterval(() => {
+      void refreshLive(client, helloInfo);
+    }, AUTO_REFRESH_INTERVAL_MS);
+  }, [refreshLive, stopBackgroundTasks]);
+
   const startSession = useCallback(async (transport) => {
     setStatus("connecting");
     setQi2Error("");
+    lastHistoryCountRef.current = -1;
     logsRef.current = [];
     setLogs([]);
     const client = new HidClient(transport, {
       onLog: appendLog,
       onDisconnect: () => {
-        stopHeartbeat();
+        stopBackgroundTasks();
         setStatus("idle");
-        helloRef.current = null;
         setHello(null);
         setBattery(null);
       },
@@ -118,12 +159,11 @@ export function usePowerBank() {
     clientRef.current = client;
     await client.open();
     const helloInfo = await client.handshake();
-    helloRef.current = helloInfo;
     setHello(helloInfo);
     setStatus("connected");
-    await refreshAll(client, helloInfo);
-    startHeartbeat(client);
-  }, [appendLog, refreshAll, startHeartbeat, stopHeartbeat]);
+    await loadInitialSnapshot(client, helloInfo);
+    startBackgroundTasks(client, helloInfo);
+  }, [appendLog, loadInitialSnapshot, startBackgroundTasks, stopBackgroundTasks]);
 
   const connectWebHid = useCallback(async () => {
     const transport = await WebHidTransport.request();
@@ -132,24 +172,23 @@ export function usePowerBank() {
   }, [startSession]);
 
   const disconnect = useCallback(async () => {
-    stopHeartbeat();
+    stopBackgroundTasks();
     const client = clientRef.current;
     clientRef.current = null;
     if (client) await client.disconnect();
     setStatus("idle");
-    helloRef.current = null;
     setHello(null);
     setBattery(null);
     setCells([]);
     setCellIds({});
     setHistory([]);
     setQi2Status(null);
-  }, [stopHeartbeat]);
+  }, [stopBackgroundTasks]);
 
   const toggleQi2 = useCallback(async (targetEnabled) => {
     const client = clientRef.current;
     const qi2Cfg = hello?.modelConfig?.capabilities?.qi2;
-    if (!client || !qi2Cfg?.protocols?.length || qi2Busy) return;
+    if (!client || !qi2Cfg?.protocols?.length || qi2BusyRef.current) return;
     qi2BusyRef.current = true;
     setQi2Busy(true);
     setQi2Stage("handshake");
@@ -185,55 +224,37 @@ export function usePowerBank() {
         : result.usedFallback
           ? `${result.protocol}-fallback`
           : result.protocol;
-      if (status === "connected") {
-        void reportQi2Event({
-          model: hello?.modelConfig?.model,
-          snBytes: hello?.snBytes,
-          action: targetEnabled,
-          ok: true,
-          detail,
-          info: { ...baseInfo, protocol: result.protocol, writeStatus: result.writeStatus ?? 0, readbackTries: result.attempts, readback: result.status.enabled },
-          devLogs: logsRef.current.slice(flowStart),
-        });
-      }
+      void reportQi2Event({
+        model: hello?.modelConfig?.model,
+        snBytes: hello?.snBytes,
+        action: targetEnabled,
+        ok: true,
+        detail,
+        info: { ...baseInfo, protocol: result.protocol, writeStatus: result.writeStatus ?? 0, readbackTries: result.attempts, readback: result.status.enabled },
+        devLogs: logsRef.current.slice(flowStart),
+      });
     } catch (err) {
       setQi2Error(err.message);
-      if (status === "connected") {
-        void reportQi2Event({
-          model: hello?.modelConfig?.model,
-          snBytes: hello?.snBytes,
-          action: targetEnabled,
-          ok: false,
-          detail: err.message,
-          info: baseInfo,
-          devLogs: logsRef.current.slice(flowStart),
-        });
-      }
+      void reportQi2Event({
+        model: hello?.modelConfig?.model,
+        snBytes: hello?.snBytes,
+        action: targetEnabled,
+        ok: false,
+        detail: err.message,
+        info: baseInfo,
+        devLogs: logsRef.current.slice(flowStart),
+      });
     } finally {
+      qi2BusyRef.current = false;
       setQi2Stage("");
       setQi2Busy(false);
-      qi2BusyRef.current = false;
     }
-  }, [battery, cellIds, hello, qi2Busy, status, tempModel]);
+  }, [battery, cellIds, hello, tempModel]);
 
-  useEffect(() => () => stopHeartbeat(), [stopHeartbeat]);
-
-  useEffect(() => {
-    if (status !== "connected") return undefined;
-    const timer = setInterval(() => {
-      const client = clientRef.current;
-      if (!client || qi2BusyRef.current || refreshBusyRef.current) return;
-      refreshBusyRef.current = true;
-      void refreshAll(client, helloRef.current)
-        .catch(() => undefined)
-        .finally(() => {
-          refreshBusyRef.current = false;
-        });
-    }, AUTO_REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [refreshAll, status]);
+  useEffect(() => () => stopBackgroundTasks(), [stopBackgroundTasks]);
 
   return {
+    client: clientRef.current,
     status,
     isConnected: status === "connected",
     hello,
@@ -249,7 +270,7 @@ export function usePowerBank() {
     logs,
     connectWebHid,
     disconnect,
-    refresh: () => clientRef.current && refreshAll(clientRef.current, hello),
+    refresh: () => clientRef.current && refreshLive(clientRef.current, hello),
     toggleQi2,
     clearLogs: () => {
       logsRef.current = [];

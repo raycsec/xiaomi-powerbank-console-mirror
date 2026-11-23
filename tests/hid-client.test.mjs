@@ -3,7 +3,7 @@ if (!globalThis.crypto) globalThis.crypto = webcrypto;
 import test from "node:test";
 import assert from "node:assert/strict";
 import { HidClient } from "../src/hid/HidClient.js";
-import { MockHidTransport } from "./support/MockHidTransport.js";
+import { MockHidTransport } from "../src/hid/MockHidTransport.js";
 
 test("Full HID read flow: handshake, battery, cells, IDs, tempModel, history, heartbeat, disconnect", async () => {
   const transport = new MockHidTransport({ modelId: 16 });
@@ -94,4 +94,46 @@ test("0xFE echo handshake is handled gracefully without throwing", async () => {
   const res = await client.handshake();
   assert.equal(res.isEcho, true);
   await client.close();
+});
+
+test("WPB0525S 27B Hello (24B SN) encrypted Qi2.2 enable & disable succeeds end-to-end", async () => {
+  const t0525 = new MockHidTransport({ modelId: 10, helloPayloadLength: 27, serial: "DMPB0525S202600000012345" });
+  const c0525 = new HidClient(t0525);
+  await c0525.open();
+  const hello = await c0525.handshake();
+  assert.equal(hello.snBytes.length, 24);
+  assert.equal(hello.serialNumber, "DMPB0525S202600000012345");
+
+  const onRes = await c0525.setQi2(true, ["encrypted"], { readbackIntervalMs: 5, commandDelayMs: 0 });
+  assert.equal(onRes.protocol, "encrypted");
+  assert.equal(onRes.status.enabled, true);
+
+  const offRes = await c0525.setQi2(false, ["encrypted"], { readbackIntervalMs: 5, commandDelayMs: 0 });
+  assert.equal(offRes.status.enabled, false);
+  await c0525.close();
+});
+
+test("DevTools consoleLog emits structured TX/RX raw & decoded payloads without prose", async () => {
+  const captured = [];
+  const origLog = console.log;
+  console.log = (...args) => captured.push(args);
+  try {
+    const t = new MockHidTransport({ modelId: 10, helloPayloadLength: 27, serial: "DMPB0525S202600000012345" });
+    const c = new HidClient(t, { consoleLog: true });
+    await c.open();
+    await c.handshake();
+    await c.getBatteryInfo();
+    await c.close();
+  } finally {
+    console.log = origLog;
+  }
+  const txLogs = captured.filter((a) => a[0] === "[HID TX]");
+  const rxLogs = captured.filter((a) => a[0] === "[HID RX]");
+  assert.ok(txLogs.length >= 2);
+  assert.ok(rxLogs.length >= 2);
+  const helloRx = rxLogs.find((a) => a[1].cmd === "0x10");
+  assert.equal(helloRx[1].decoded.modelId, 10);
+  assert.equal(helloRx[1].decoded.snLen, 24);
+  const battRx = rxLogs.find((a) => a[1].cmd === "0x11");
+  assert.equal(battRx[1].decoded.health, 97);
 });

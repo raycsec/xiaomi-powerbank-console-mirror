@@ -31,7 +31,7 @@ export interface PowerBankModelConfig {
 }
 
 export interface HidTransport {
-  kind: "webhid";
+  kind: "webhid" | "demo";
   info: { productName: string; vendorId: number; productId: number };
   open(): Promise<void>;
   close(): Promise<void>;

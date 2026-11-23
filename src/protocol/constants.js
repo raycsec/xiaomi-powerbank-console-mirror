@@ -1,5 +1,5 @@
 export const FRAME_HEAD = 0xa5;
-export const HID_FRAME_SIZE = 32;
+export const MAX_HID_FRAME_SIZE = 64;
 export const REPORT_ID = 0;
 
 export const HID_FILTERS = [{ vendorId: 0x2717 }, { vendorId: 0x1a86 }];
@@ -43,8 +43,6 @@ export const TIMEOUT_MS = {
   HEARTBEAT_INTERVAL: 15000,
 };
 
-export const AUTO_REFRESH_MS = 10000;
-
 export const FAULT_KEYS = {
   0: "fault_normal",
   1: "fault_overvoltage",
@@ -56,6 +54,23 @@ export const FAULT_KEYS = {
   7: "fault_short_circuit",
   8: "fault_mos",
   9: "fault_afe",
+};
+
+export const HISTORY_FAULT_NAMES = {
+  0: "正常",
+  1: "过压",
+  2: "欠压",
+  3: "高温",
+  4: "欠温",
+  5: "过流",
+  6: "短路",
+  7: "压差",
+};
+
+export const HISTORY_STATE_NAMES = {
+  0: "放电",
+  64: "充电",
+  128: "待机",
 };
 
 export const CHARGE_STATE_KEYS = {

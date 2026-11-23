@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { getQi2ModelGroups } from "../config/models.js";
 import { useI18n } from "../context/I18nContext.jsx";
 import { HidClient } from "../hid/HidClient.js";
 import { WebHidTransport } from "../hid/WebHidTransport.js";
-import { AUTO_REFRESH_MS } from "../protocol/constants.js";
 import { fetchQi2Stats, reportQi2Event } from "../services/qi2Telemetry.js";
 
 export default function SupportQi2Page() {
@@ -11,40 +10,40 @@ export default function SupportQi2Page() {
   const groups = getQi2ModelGroups();
   const [statsMap, setStatsMap] = useState({});
   const [trialLog, setTrialLog] = useState([]);
-  const [trialStatus, setTrialStatus] = useState("");
+  const [currentState, setCurrentState] = useState({ tone: "gray", text: "待测试" });
   const [busy, setBusy] = useState(false);
+  const logBoxRef = useRef(null);
 
   useEffect(() => {
     const models = [...groups.supported, ...groups.experimental].map((m) => m.model);
-    let cancelled = false;
-    const loadStats = () => {
-      Promise.all(models.map(async (model) => [model, await fetchQi2Stats(model)])).then((entries) => {
-        if (cancelled) return;
-        const next = {};
-        for (const [m, st] of entries) if (st) next[m] = st;
-        setStatsMap(next);
-      });
-    };
-    loadStats();
-    const timer = setInterval(loadStats, AUTO_REFRESH_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
+    Promise.all(models.map(async (model) => [model, await fetchQi2Stats(model)])).then((entries) => {
+      const next = {};
+      for (const [m, st] of entries) if (st) next[m] = st;
+      setStatsMap(next);
+    });
   }, []);
+
+  useEffect(() => {
+    const el = logBoxRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [trialLog]);
 
   const runTrial = async (targetEnabled) => {
     setBusy(true);
-    setTrialStatus("");
+    setCurrentState({ tone: "blue", text: targetEnabled ? "开启中…" : "关闭中…" });
     const collected = [];
     setTrialLog([]);
     let client = null;
     let hello = null;
+    let battery = null;
     let transport = null;
 
     try {
       transport = await WebHidTransport.request();
-      if (!transport) return;
+      if (!transport) {
+        setCurrentState({ tone: "gray", text: "已取消" });
+        return;
+      }
       client = new HidClient(transport, {
         onLog: (entry) => {
           collected.push(entry);
@@ -53,12 +52,23 @@ export default function SupportQi2Page() {
       });
       await client.open();
       hello = await client.handshake();
-      const protocols = hello.isEcho ? ["legacy"] : ["encrypted", "legacy"];
+      try {
+        battery = await client.getBatteryInfo();
+      } catch {}
+      const protocols = hello.isEcho
+        ? ["legacy"]
+        : hello.modelConfig?.capabilities?.qi2?.protocols?.length
+          ? hello.modelConfig.capabilities.qi2.protocols
+          : ["encrypted", "legacy"];
       const res = await client.setQi2(targetEnabled, protocols);
+      const isEnabledNow = res.status?.enabled ?? targetEnabled;
       const detail = res.skipped
         ? `trial-skipped-already-${targetEnabled ? "on" : "off"}`
         : `trial-${res.protocol}-ok`;
-      setTrialStatus(res.skipped ? (targetEnabled ? "已处于开启状态" : "已处于关闭状态") : "尝试成功");
+      setCurrentState({
+        tone: "green",
+        text: isEnabledNow ? "已开启" : "已关闭",
+      });
       await reportQi2Event({
         model: hello.modelConfig?.model || `ECHO_${(transport.info.productId || 0).toString(16).toUpperCase()}`,
         snBytes: hello.snBytes,
@@ -66,14 +76,31 @@ export default function SupportQi2Page() {
         action: targetEnabled,
         ok: true,
         detail,
-        info: { protocol: `trial:${res.protocol}`, skipped: res.skipped, readback: res.status.enabled, readbackTries: res.attempts },
+        info: {
+          protocol: `trial:${res.protocol}`,
+          modelId: hello.modelId,
+          snLen: hello.snBytes?.length ?? 0,
+          health: battery?.health,
+          cycles: battery?.cycleCount,
+          level: battery?.level,
+          temp: battery?.temperature,
+          voltage: battery?.voltage,
+          chgState: battery?.chargeState,
+          fault: battery?.faultType,
+          faultRaw: battery?.faultRaw,
+          statusCode: battery?.statusCode,
+          writeStatus: res.writeStatus ?? 0,
+          skipped: res.skipped,
+          readback: isEnabledNow,
+          readbackTries: res.attempts,
+        },
         devLogs: collected,
       });
     } catch (err) {
       const msg = err?.message || String(err);
       collected.push({ at: new Date().toISOString(), direction: "ERROR", label: msg, hex: "" });
       setTrialLog([...collected]);
-      setTrialStatus(`尝试失败：${msg}`);
+      setCurrentState({ tone: "red", text: "失败" });
       if (transport) {
         await reportQi2Event({
           model: hello?.modelConfig?.model || "GENERIC",
@@ -82,7 +109,21 @@ export default function SupportQi2Page() {
           action: targetEnabled,
           ok: false,
           detail: /read-back mismatch/i.test(msg) ? "trial-readback-mismatch" : `trial-exception:${msg}`,
-          info: { protocol: "trial", message: msg },
+          info: {
+            protocol: "trial",
+            modelId: hello?.modelId,
+            snLen: hello?.snBytes?.length ?? 0,
+            health: battery?.health,
+            cycles: battery?.cycleCount,
+            level: battery?.level,
+            temp: battery?.temperature,
+            voltage: battery?.voltage,
+            chgState: battery?.chargeState,
+            fault: battery?.faultType,
+            faultRaw: battery?.faultRaw,
+            statusCode: battery?.statusCode,
+            message: msg,
+          },
           devLogs: collected,
         });
       }
@@ -96,10 +137,10 @@ export default function SupportQi2Page() {
     const st = statsMap[modelCode];
     if (!st || st.total < 5) return null;
     const rate = Math.round(st.successRate * 100);
-    const cls = st.errorRate > 0.3 ? "badge--amber" : st.errorRate < 0.1 ? "badge--green" : "badge--gray";
+    const cls = st.errorRate > 0.3 ? "pill--amber" : st.errorRate < 0.1 ? "pill--green" : "pill--gray";
     return (
       <div style={{ marginTop: 6 }}>
-        <span className={`badge ${cls}`}>
+        <span className={`pill ${cls}`}>
           {t("qi2_stats_badge", { rate, success: st.success, total: st.total })}
           {st.errorRate < 0.1 ? " ✓" : ""}
         </span>
@@ -121,35 +162,36 @@ export default function SupportQi2Page() {
             <div style={{ fontSize: 15, fontWeight: 700 }}>{idx + 1}. {lang === "en" ? m.nameEn : m.name}</div>
             {renderBadge(m.model)}
           </div>
-          <span className="badge badge--blue">{m.model}</span>
+          <span className="pill pill--blue">{m.model}</span>
         </div>
       ))}
 
       <div style={{ fontSize: 14, fontWeight: 700, margin: "18px 4px 10px" }}>{t("support_qi2_group_experimental")}</div>
       {groups.experimental.map((m, idx) => (
-        <div key={m.model} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 22px" }}>
+        <div key={m.model} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 22px", marginTop: idx ? 10 : 0 }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700 }}>{idx + 1}. {lang === "en" ? m.nameEn : m.name}</div>
             {renderBadge(m.model)}
           </div>
-          <span className="badge badge--amber">{m.model} · {t("models_qi2_experimental")}</span>
+          <span className="pill pill--amber">{m.model} · {t("models_qi2_experimental")}</span>
         </div>
       ))}
 
-      <div style={{ fontSize: 14, fontWeight: 700, margin: "18px 4px 10px" }}>{t("support_qi2_group_unsupported")}</div>
-      {groups.unsupportedFirmware.map((m, idx) => (
-        <div key={m.model} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 22px" }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>{idx + 1}. {lang === "en" ? m.nameEn : m.name}</div>
-          <span className="badge badge--red">{m.model} · {t("support_qi2_group_unsupported")}</span>
-        </div>
-      ))}
+      {groups.unsupportedFirmware.length > 0 && (
+        <>
+          <div style={{ fontSize: 14, fontWeight: 700, margin: "18px 4px 10px" }}>{t("support_qi2_group_unsupported")}</div>
+          {groups.unsupportedFirmware.map((m, idx) => (
+            <div key={m.model} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 22px", marginTop: idx ? 10 : 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{idx + 1}. {lang === "en" ? m.nameEn : m.name}</div>
+              <span className="pill pill--red">{m.model} · {t("support_qi2_group_unsupported")}</span>
+            </div>
+          ))}
+        </>
+      )}
 
       <div className="card" style={{ marginTop: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>{t("support_qi2_trial_title")}</div>
-            <div style={{ fontSize: 12, color: "var(--amber-text)", marginTop: 2 }}>{t("support_qi2_trial_warn")}</div>
-          </div>
+        <div className="card-head-row" style={{ marginBottom: 10 }}>
+          <div className="card-title-base">{t("support_qi2_trial_title")}</div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               type="button"
@@ -163,24 +205,29 @@ export default function SupportQi2Page() {
             </button>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
           <button type="button" className="ui-btn ui-btn--amber" disabled={busy} onClick={() => runTrial(true)}>
             {t("support_qi2_trial_on")}
           </button>
           <button type="button" className="ui-btn ui-btn--neutral" disabled={busy} onClick={() => runTrial(false)}>
             {t("support_qi2_trial_off")}
           </button>
-          {trialStatus && <span className="badge badge--gray">{trialStatus}</span>}
+          <span className={`pill pill--${currentState.tone}`}>当前状态：{currentState.text}</span>
         </div>
-        <div className="log-box">
-          {trialLog.length ? trialLog.map((l, idx) => (
-            <div key={idx} className="log-line">
-              <span className={`log-tag ${l.direction === "TX" ? "log-tag--tx" : l.direction === "RX" ? "log-tag--rx" : "log-tag--err"}`}>
-                {l.direction}
-              </span>
-              <span>{l.label}{l.hex ? ` → ${l.hex}` : ""}</span>
-            </div>
-          )) : t("protocol_empty")}
+        <div ref={logBoxRef} className="proto-log-box">
+          {trialLog.length ? (
+            trialLog.map((l, idx) => (
+              <div key={idx} className="proto-log-row">
+                <span className={`proto-dir ${l.direction === "TX" ? "proto-dir--tx" : l.direction === "RX" ? "proto-dir--rx" : "proto-dir--err"}`}>
+                  {l.direction}
+                </span>
+                <span className="proto-label">{l.label}</span>
+                <span className="proto-hex mono">{l.hex}</span>
+              </div>
+            ))
+          ) : (
+            <div className="card-subtitle">{t("protocol_empty")}</div>
+          )}
         </div>
       </div>
     </div>

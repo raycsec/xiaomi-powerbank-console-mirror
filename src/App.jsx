@@ -9,7 +9,7 @@ import PageHeaderCard from "./components/PageHeaderCard.jsx";
 import SupportQi2Page from "./components/SupportQi2Page.jsx";
 import { I18nProvider, useI18n } from "./context/I18nContext.jsx";
 
-function ShellRoutes() {
+function ShellRoutes({ labSlot }) {
   const { t } = useI18n();
   return (
     <Routes>
@@ -21,7 +21,7 @@ function ShellRoutes() {
             <div className="mirror-app">
               <PageHeaderCard title={t("app_title")} subtitle={t("app_subtitle")} />
               <div style={{ marginTop: 16 }}>
-                <DevicePanel />
+                <DevicePanel labSlot={labSlot} />
               </div>
             </div>
           </BrowserGate>
@@ -57,11 +57,11 @@ function ShellRoutes() {
   );
 }
 
-export default function App() {
+export default function App({ labSlot = null }) {
   return (
     <I18nProvider>
       <BrowserRouter>
-        <ShellRoutes />
+        <ShellRoutes labSlot={labSlot} />
       </BrowserRouter>
     </I18nProvider>
   );

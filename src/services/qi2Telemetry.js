@@ -1,4 +1,4 @@
-export const APP_VERSION = "v33";
+export const APP_VERSION = "v34";
 
 export async function hashSerialHex(snBytes, fallbackSeed = "UNKNOWN") {
   const seed =

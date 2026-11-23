@@ -11,12 +11,10 @@ import {
 import { WEBHID_GATE_SCRIPT, renderConsentPage, renderErrorPage } from "./consentPage.js";
 import { signHmac } from "./crypto.js";
 
-const BUILT_INDEX_KEY = "eco--usb-device-web/static/index.html";
+const STATIC_INDEX_KEY = "eco--usb-device-web/static/index.html";
 const INDEX_CACHE_TTL_MS = 60_000;
 
-let cachedIndexHtml = null;
-let cachedIndexAt = 0;
-let cachedIndexSource = null;
+const indexHtmlCache = new Map();
 
 const MIME_MAP = {
   js: "application/javascript; charset=utf-8",
@@ -54,42 +52,38 @@ function applySecurityHeaders(headers, nonce = null) {
 export function injectGateAndNonce(html, scriptNonce) {
   const withNonce = html.replace(/<script\b(?![^>]*\bnonce=)/gi, `<script nonce="${scriptNonce}"`);
   const gateTag = `<script nonce="${scriptNonce}">${WEBHID_GATE_SCRIPT}</script>`;
-  if (/<\/head>/i.test(withNonce)) {
-    return withNonce.replace(/<\/head>/i, `${gateTag}</head>`);
-  }
+  if (/<\/head>/i.test(withNonce)) return withNonce.replace(/<\/head>/i, `${gateTag}</head>`);
   return `${gateTag}${withNonce}`;
 }
 
 export function extractPreloadLinks(html) {
   const links = [];
-  for (const m of html.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["'](\/eco--usb-device-web\/[^"']+)["']/gi)) {
+  for (const m of html.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["'](\/eco--usb-device-web\/(?:static|lab)\/[^"']+)["']/gi)) {
     links.push(`<${m[1]}>; rel=preload; as=style`);
   }
-  for (const m of html.matchAll(/<script\b[^>]*type=["']module["'][^>]*src=["'](\/eco--usb-device-web\/[^"']+)["']/gi)) {
+  for (const m of html.matchAll(/<script\b[^>]*type=["']module["'][^>]*src=["'](\/eco--usb-device-web\/(?:static|lab)\/[^"']+)["']/gi)) {
     links.push(`<${m[1]}>; rel=modulepreload`);
   }
   return links;
 }
 
 async function loadBuiltAppHtml(url, env) {
+  const key = STATIC_INDEX_KEY;
   const source = env.XIAOMI_MIRROR || env.ASSETS || null;
-  if (cachedIndexHtml && cachedIndexSource === source && Date.now() - cachedIndexAt < INDEX_CACHE_TTL_MS) {
-    return cachedIndexHtml;
+  const cached = indexHtmlCache.get(key);
+  if (cached && cached.source === source && Date.now() - cached.at < INDEX_CACHE_TTL_MS) {
+    return cached.html;
   }
   let html = null;
   if (env.XIAOMI_MIRROR) {
-    const obj = await env.XIAOMI_MIRROR.get(BUILT_INDEX_KEY);
+    const obj = await env.XIAOMI_MIRROR.get(key);
     if (obj) html = typeof obj.text === "function" ? await obj.text() : await new Response(obj.body).text();
   }
   if (!html && env.ASSETS && typeof env.ASSETS.fetch === "function") {
-    const res = await env.ASSETS.fetch(new URL(`/${BUILT_INDEX_KEY}`, url));
+    const res = await env.ASSETS.fetch(new URL(`/${key}`, url));
     if (res.ok) html = await res.text();
   }
-  if (html) {
-    cachedIndexHtml = html;
-    cachedIndexAt = Date.now();
-    cachedIndexSource = source;
-  }
+  if (html) indexHtmlCache.set(key, { html, at: Date.now(), source });
   return html;
 }
 
@@ -271,12 +265,14 @@ export default {
     }
 
     if (devMode) {
-      const devHtml = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>小米移动电源详情</title></head><body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>`;
+      const entry = "/src/main.jsx";
+      const devHtml = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>小米移动电源详情</title></head><body><div id="root"></div><script type="module" src="${entry}"></script></body></html>`;
       return new Response(injectGateAndNonce(devHtml, scriptNonce), { status: 200, headers: h });
     }
 
+    const expectedKey = STATIC_INDEX_KEY;
     return new Response(
-      "Frontend build not found in R2 (eco--usb-device-web/static/index.html). Run `npm run build` then `node deploy/upload-assets.mjs <accountId>`.",
+      `Frontend build not found in R2 (${expectedKey}).`,
       { status: 503, headers: applySecurityHeaders(new Headers({ "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" })) },
     );
   },

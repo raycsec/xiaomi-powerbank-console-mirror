@@ -8,13 +8,33 @@ import {
   decodeQi2Status,
   decodeTempModel,
 } from "../protocol/decoders.js";
-import { buildCommandFrame, buildHelloFrame, bytesToHex, extractFrames } from "../protocol/frames.js";
+import { buildCommandFrame, buildHelloFrame, bytesToHex, extractFrames } from "../protocol/codec.js";
 import { QI2_STRATEGIES } from "../protocol/qi2Strategies.js";
+
+
+function decodeFrameForConsole(cmd, payload) {
+  try {
+    if (cmd === RESP.HELLO) {
+      const h = decodeHelloResponse(payload);
+      return { modelId: h.modelId, model: h.modelConfig?.model, snLen: h.snBytes.length, sn: h.serialNumber, chgState: h.chargeState };
+    }
+    if (cmd === RESP.BATTERY_INFO) return decodeBatteryInfo(payload);
+    if (cmd === RESP.CELL_STATUS) return decodeCellStatus(payload);
+    if (cmd === RESP.HISTORY) return decodeHistoryBatch(payload, 0);
+    if (cmd === RESP.BATTERY_ID) return decodeBatteryId(payload);
+    if (cmd === RESP.CELL_TEMP_MODEL) return decodeTempModel(payload);
+    if (cmd === RESP.QI2_STATUS) return decodeQi2Status(payload);
+    if (cmd === RESP.SET_QI2_LEGACY || cmd === RESP.SET_QI2_ENCRYPTED) return decodeQi2WriteResponse(payload);
+  } catch {}
+  return null;
+}
 
 export class HidClient {
   constructor(transport, callbacks = {}) {
     this.transport = transport;
     this.callbacks = callbacks;
+    this.onLog = callbacks.onLog || null;
+    this.consoleLog = callbacks.consoleLog ?? (typeof window !== "undefined");
     this.pending = new Map();
     this.inputBuffer = new Uint8Array(0);
     this.opened = false;
@@ -201,7 +221,7 @@ export class HidClient {
     });
     void responsePromise.catch(() => undefined);
 
-    this.emitLog("TX", label || `CMD 0x${command.toString(16).toUpperCase()}`, frame);
+    this.emitLog("TX", label || `0x${command.toString(16).toUpperCase().padStart(2, "0")}`, frame, { cmd: `0x${command.toString(16).toUpperCase().padStart(2, "0")}`, len: frame.length >= 4 ? frame[2] : 0 });
     try {
       await this.transport.send(frame);
     } catch (error) {
@@ -227,9 +247,14 @@ export class HidClient {
     for (const frame of frames) {
       this.emitLog(
         "RX",
-        `RESP 0x${frame.command.toString(16).toUpperCase()}`,
+        `0x${frame.command.toString(16).toUpperCase().padStart(2, "0")}`,
         frame.raw,
-        { crcValid: frame.crcValid, length: frame.length },
+        {
+          cmd: `0x${frame.command.toString(16).toUpperCase().padStart(2, "0")}`,
+          len: frame.length,
+          crcOk: frame.crcValid,
+          decoded: decodeFrameForConsole(frame.command, frame.payload),
+        },
       );
 
       const waiter = this.pending.get(frame.command);
@@ -266,13 +291,13 @@ export class HidClient {
     this.pending.clear();
   }
 
-  emitLog(direction, label, bytes = null, extra = null) {
-    this.callbacks.onLog?.({
-      at: new Date().toISOString(),
-      direction,
-      label,
-      hex: bytes ? bytesToHex(bytes, true) : "",
-      extra,
-    });
+  emitLog(direction, label, bytes, meta = null) {
+    const hex = bytes ? bytesToHex(bytes, true) : "";
+    if (this.consoleLog && typeof console !== "undefined") {
+      const tag = direction === "TX" ? "[HID TX]" : direction === "RX" ? "[HID RX]" : `[HID ${direction}]`;
+      console.log(tag, meta ? { ...meta, raw: hex } : { label, raw: hex });
+    }
+    if (!this.onLog) return;
+    this.onLog({ at: new Date().toISOString(), direction, label, hex, ...(meta ? { meta } : {}) });
   }
 }

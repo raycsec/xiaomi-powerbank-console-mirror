@@ -5,8 +5,8 @@ import {
   decodeQi2Status,
   decodeQi2WriteResponse,
 } from "./decoders.js";
-import { buildHelloFrame } from "./frames.js";
-import { buildEncryptedQi2Payload } from "./qi2Ccm.js";
+import { buildHelloFrame } from "./codec.js";
+import { buildEncryptedQi2Payload } from "./qi2Crypto.js";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -35,6 +35,7 @@ async function pollQi2Status(client, targetEnabled, options = {}) {
 export const legacyQi2Strategy = {
   id: "legacy",
   async execute(client, targetEnabled, options = {}) {
+    const commandDelayMs = options.commandDelayMs ?? 150;
     const before = decodeQi2Status(
       await client.requestUnlocked(CMD.GET_QI2_STATUS, RESP.QI2_STATUS, TIMEOUT_MS.COMMAND),
     );
@@ -42,6 +43,7 @@ export const legacyQi2Strategy = {
       return { protocol: "legacy", skipped: true, status: before, attempts: 0 };
     }
 
+    if (commandDelayMs > 0) await sleep(commandDelayMs);
     const writeResp = decodeQi2WriteResponse(
       await client.requestUnlocked(
         CMD.SET_QI2_LEGACY,
@@ -65,6 +67,7 @@ export const legacyQi2Strategy = {
 export const encryptedQi2Strategy = {
   id: "encrypted",
   async execute(client, targetEnabled, options = {}) {
+    const commandDelayMs = options.commandDelayMs ?? 150;
     const { frame: helloFrame, timestamp } = buildHelloFrame();
     const helloPayload = await client.requestRawUnlocked(
       CMD.HELLO,
@@ -78,6 +81,7 @@ export const encryptedQi2Strategy = {
       throw new Error("Device serial bytes unavailable");
     }
 
+    if (commandDelayMs > 0) await sleep(commandDelayMs);
     const before = decodeQi2Status(
       await client.requestUnlocked(CMD.GET_QI2_STATUS, RESP.QI2_STATUS, TIMEOUT_MS.COMMAND),
     );
@@ -85,13 +89,14 @@ export const encryptedQi2Strategy = {
       return { protocol: "encrypted", skipped: true, status: before, attempts: 0 };
     }
 
+    if (commandDelayMs > 0) await sleep(commandDelayMs);
     const battery = decodeBatteryInfo(
       await client.requestUnlocked(CMD.GET_BATTERY_INFO, RESP.BATTERY_INFO, TIMEOUT_MS.COMMAND),
     );
     if (!battery.success) {
       throw new Error(`Battery info query failed (status=${battery.statusCode})`);
     }
-    if (targetEnabled && battery.faultType !== 0) {
+    if (targetEnabled && !options.ignoreFault && battery.faultType !== 0) {
       throw new Error(`Device reports active fault (code=${battery.faultType})`);
     }
 
@@ -103,6 +108,7 @@ export const encryptedQi2Strategy = {
       enabled: targetEnabled,
     });
 
+    if (commandDelayMs > 0) await sleep(commandDelayMs);
     const writeResp = decodeQi2WriteResponse(
       await client.requestUnlocked(
         CMD.SET_QI2_ENCRYPTED,

@@ -4,9 +4,9 @@ if (!globalThis.crypto) globalThis.crypto = webcrypto;
 import test from "node:test";
 import assert from "node:assert/strict";
 import { HidClient } from "../src/hid/HidClient.js";
-import { MockHidTransport } from "./support/MockHidTransport.js";
+import { MockHidTransport } from "../src/hid/MockHidTransport.js";
 import { CMD, RESP } from "../src/protocol/constants.js";
-import { buildEncryptedQi2Payload } from "../src/protocol/qi2Ccm.js";
+import { buildEncryptedQi2Payload } from "../src/protocol/qi2Crypto.js";
 import { POWER_BANK_MODELS, resolveModelConfig } from "../src/config/models.js";
 
 test("[抢占] Concurrent heartbeat & refresh do not preempt Qi2.2 encrypted transaction", async () => {
@@ -129,7 +129,7 @@ test("[6] Firmware rejects stale-timestamp ciphertext & skips redundant write wh
 });
 
 test("[7] All 18 models & extreme hardware boundaries (WPB1007ZX, P25, -20C, -3000mA, unknown ID)", async () => {
-  assert.equal(POWER_BANK_MODELS.length, 18);
+  assert.equal(POWER_BANK_MODELS.length, 24);
   for (const m of POWER_BANK_MODELS) {
     assert.ok(m.id > 0 && m.model && m.name && m.nameEn && m.connection);
     assert.ok(m.capabilities?.qi2 && m.display);

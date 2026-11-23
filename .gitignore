@@ -1,7 +1,4 @@
 node_modules/
-.wrangler/
-.dev.vars
-*.log
-tmp/
-dist/
 eco--usb-device-web/
+dist/
+.DS_Store

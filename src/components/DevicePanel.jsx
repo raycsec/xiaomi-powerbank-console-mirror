@@ -7,230 +7,271 @@ import { formatLocalDateTime } from "../utils/formatTime.js";
 import CopyableText from "./CopyableText.jsx";
 import Qi2Card from "./Qi2Card.jsx";
 
-export default function DevicePanel() {
-  const { lang, t } = useI18n();
-  const pb = usePowerBank();
-  const [activeTab, setActiveTab] = useState("details");
+const HISTORY_PAGE_SIZE = 5;
 
-  if (!pb.isConnected || !pb.battery) {
+export default function DevicePanel({ labSlot: LabSlot = null }) {
+  const { t, lang } = useI18n();
+  const pb = usePowerBank();
+  const [historyPage, setHistoryPage] = useState(1);
+
+  const modelCfg = pb.hello?.modelConfig;
+  const displayCfg = modelCfg?.display || { showSerialNumber: true, showCellSerialNumber: true };
+  const qi2Cfg = modelCfg?.capabilities?.qi2;
+  const tempRangeLabel =
+    pb.tempModel?.success && pb.tempModel.lowTemp != null && pb.tempModel.highTemp != null
+      ? `${pb.tempModel.lowTemp}℃~${pb.tempModel.highTemp}℃`
+      : modelCfg?.tempRange || "-20℃~60℃";
+
+  const totalHistoryPages = Math.max(1, Math.ceil(pb.history.length / HISTORY_PAGE_SIZE));
+  const safePage = Math.min(historyPage, totalHistoryPages);
+  const pagedHistory = pb.history.slice((safePage - 1) * HISTORY_PAGE_SIZE, safePage * HISTORY_PAGE_SIZE);
+
+  if (!pb.isConnected) {
     return (
-      <>
-        <section className="card">
-          <h2 className="card-title-lg" style={{ marginBottom: 18 }}>{t("how_title")}</h2>
-          <div className="step-row">
-            <div className="step-num">1</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="card">
+          <div className="card-head-row" style={{ alignItems: "flex-start" }}>
             <div>
-              <div style={{ fontWeight: 600 }}>{t("how_step1_desc")}</div>
+              <div className="card-title-base">{t("empty_title")}</div>
+              <p className="card-subtitle" style={{ marginTop: 4 }}>{t("empty_desc")}</p>
+            </div>
+            <Link to="/models" className="ui-btn ui-btn--neutral ui-btn--sm">{t("how_models_link")}</Link>
+          </div>
+          <div className="steps-grid" style={{ marginTop: 16 }}>
+            <div className="step-item">
+              <div className="step-title">{t("how_step1_title")}</div>
+              <div className="step-desc">{t("how_step1_desc")}</div>
+            </div>
+            <div className="step-item">
+              <div className="step-title">{t("how_step2_title")}</div>
+              <div className="step-desc">{t("how_step2_desc")}</div>
+            </div>
+            <div className="step-item">
+              <div className="step-title">{t("how_step3_title")}</div>
+              <div className="step-desc">{t("how_step3_desc")}</div>
             </div>
           </div>
-          <div className="step-row">
-            <div className="step-num">2</div>
-            <div>
-              <div style={{ fontWeight: 600 }}>{t("how_step2_desc")}</div>
-            </div>
-          </div>
-          <div className="step-row" style={{ marginBottom: 22 }}>
-            <div className="step-num">3</div>
-            <div>
-              <div style={{ fontWeight: 600 }}>{t("how_step3_desc")}</div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <button type="button" className="ui-btn ui-btn--primary" style={{ minWidth: 180 }} onClick={pb.connectWebHid}>
+          <div style={{ marginTop: 18 }}>
+            <button type="button" className="ui-btn ui-btn--primary" onClick={pb.connectWebHid}>
               {t("connect_button")}
             </button>
-            <Link to="/models" className="ui-btn ui-btn--neutral">
-              {t("how_models_link")}
-            </Link>
           </div>
-        </section>
-
-        <section className="card">
-          <h2 className="card-title-lg" style={{ marginBottom: 16 }}>{t("empty_title")}</h2>
-          <div className="ui-tabs">
-            <div className="ui-tab is-active">{t("tab_details")}</div>
-            <div className="ui-tab">{t("tab_history")}</div>
-          </div>
-          <div className="inner-panel" style={{ textAlign: "center", color: "var(--text-faint)", padding: "38px 20px" }}>
-            {t("empty_desc")}
-          </div>
-        </section>
-      </>
+        </div>
+      </div>
     );
   }
 
-  const modelConfig = pb.hello?.modelConfig;
-  const display = modelConfig?.display || {};
-  const firstParsed = Object.values(pb.cellIds).find((c) => c.parsed)?.parsed;
-  const tempRange = pb.tempModel?.success
-    ? `${pb.tempModel.lowTemp}℃~${pb.tempModel.highTemp}℃`
-    : modelConfig?.tempRange || "-20℃~60℃";
-  const tempSensors = pb.cells.filter((c) => c.hasTemperatureSensor);
-
   return (
-    <>
-      <Qi2Card
-        modelConfig={modelConfig}
-        qi2Status={pb.qi2Status}
-        busy={pb.qi2Busy}
-        stage={pb.qi2Stage}
-        error={pb.qi2Error}
-        onToggle={pb.toggleQi2}
-      />
-
-      <section className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <h2 className="card-title-lg">{t("connected_title")}</h2>
-            <span className="badge badge--blue">{t(CHARGE_STATE_KEYS[pb.battery.chargeState] || "status_unknown")}</span>
-            <span className={`badge ${pb.battery.faultType ? "badge--red" : "badge--green"}`}>
-              {t(FAULT_KEYS[pb.battery.faultType] || "fault_normal")}
-            </span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card">
+        <div className="card-head-row">
+          <div>
+            <div className="card-title-lg">{lang === "en" ? modelCfg?.nameEn : modelCfg?.name}</div>
+            <div className="card-subtitle" style={{ marginTop: 4 }}>
+              {modelCfg?.model}
+              {modelCfg?.connection && modelCfg.connection !== "--" ? ` · ${modelCfg.connection}` : ""}
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 12, color: "var(--text-faint)", whiteSpace: "nowrap" }}>{t("updated_just_now")}</span>
-            <button type="button" className="ui-btn ui-btn--neutral ui-btn--sm" onClick={pb.refresh}>{t("refresh_button")}</button>
-            <button type="button" className="ui-btn ui-btn--neutral ui-btn--sm" onClick={pb.disconnect}>
-              {t("disconnect_button")}
-            </button>
-          </div>
-        </div>
-
-        <div className="battery-bar-wrap">
-          <div className="battery-bar-head">
-            <span style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("field_battery_level")}</span>
-            <span style={{ fontSize: 22, fontWeight: 700 }}>{pb.battery.level}%</span>
-          </div>
-          <div className="battery-bar-track">
-            <div className="battery-bar-fill" style={{ width: `${Math.min(100, Math.max(0, pb.battery.level))}%` }} />
-          </div>
-          <div className="battery-summary">
-            <span>{t("field_battery_health")} <strong>{pb.battery.health}%</strong></span>
-            <span>{t("field_cycle_count")} <strong>{pb.battery.cycleCount} {t("field_cycle_unit")}</strong></span>
-            <span>{t("section_temperature")} <strong>{pb.battery.temperature} °C</strong></span>
-            <span>
-              {t("field_total_voltage")} <strong className="mono">{(pb.battery.voltage / 1000).toFixed(2)} V · {(pb.battery.current / 1000).toFixed(2)} A</strong>
-            </span>
-          </div>
-        </div>
-
-        <div className="ui-tabs">
-          <button type="button" className={`ui-tab ${activeTab === "details" ? "is-active" : ""}`} style={{ border: 0, background: "none", cursor: "pointer" }} onClick={() => setActiveTab("details")}>
-            {t("tab_details")}
-          </button>
-          <button type="button" className={`ui-tab ${activeTab === "history" ? "is-active" : ""}`} style={{ border: 0, background: "none", cursor: "pointer" }} onClick={() => setActiveTab("history")}>
-            {t("tab_history")} ({pb.history.length})
+          <button type="button" className="ui-btn ui-btn--danger-outline ui-btn--sm" onClick={pb.disconnect}>
+            {t("disconnect_button")}
           </button>
         </div>
 
-        {activeTab === "details" && (
-          <div className="inner-panel">
-            <div className="info-section">
-              <div className="info-section__label">{t("section_basic")}</div>
-              <div className="info-section__body">
-                <div className="kv-row"><div className="kv-key">{t("field_product_name")}</div><div className="kv-val">{lang === "en" ? modelConfig?.nameEn : modelConfig?.name}</div></div>
-                <div className="kv-row"><div className="kv-key">{t("field_product_model")}</div><div className="kv-val mono">{modelConfig?.model || "--"}</div></div>
-                <div className="kv-row">
-                  <div className="kv-key">{t("field_device_sn")}</div>
-                  <div className="kv-val">
-                    {display.showSerialNumber ? <CopyableText value={pb.hello?.serialNumber || "--"} /> : t("field_sn_hidden")}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="info-section">
-              <div className="info-section__label">{t("section_battery")}</div>
-              <div className="info-section__body">
-                <div className="kv-row"><div className="kv-key">{t("field_battery_health")}</div><div className="kv-val">{pb.battery.health}%</div></div>
-                <div className="kv-row"><div className="kv-key">{t("field_cycle_count")}</div><div className="kv-val">{pb.battery.cycleCount} {t("field_cycle_unit")}</div></div>
-                <div className="kv-row"><div className="kv-key">{t("field_battery_model")}</div><div className="kv-val mono">{pb.tempModel?.batteryModel || firstParsed?.miCodeInfo?.cellModel || "--"}</div></div>
-                <div className="kv-row"><div className="kv-key">{t("field_battery_manufacturer")}</div><div className="kv-val">{lang === "en" ? firstParsed?.fixed?.assemblyFactoryEn || "--" : firstParsed?.fixed?.assemblyFactory || "--"}</div></div>
-                <div className="kv-row"><div className="kv-key">{t("field_total_voltage")}</div><div className="kv-val mono">{(pb.battery.voltage / 1000).toFixed(2)} V</div></div>
-              </div>
-            </div>
-
-            <div className="info-section">
-              <div className="info-section__label">{t("section_temperature")}</div>
-              <div className="info-section__body">
-                {tempSensors.map((c) => (
-                  <div key={c.index} className="kv-row">
-                    <div className="kv-key">{t("field_temp_sensor", { index: c.index })}</div>
-                    <div className="kv-val">{c.temperature} °C</div>
-                  </div>
-                ))}
-                <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 6 }}>
-                  {t("field_temp_range_tip", { range: tempRange })}
-                </div>
-              </div>
-            </div>
-
-            <div className="info-section">
-              <div className="info-section__label">{t("section_cells")}</div>
-              <div className="info-section__body">
-                <table className="mirror-table">
-                  <thead>
-                    <tr>
-                      <th>{t("col_cell")}</th>
-                      <th>{t("col_voltage")}</th>
-                      <th>{t("col_production_date")}</th>
-                      {display.showCellSerialNumber && <th>{t("col_cell_sn")}</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pb.cells.map((c) => (
-                      <tr key={c.index}>
-                        <td>{t("col_cell")} {c.index}</td>
-                        <td className="mono">{(c.voltage / 1000).toFixed(3)} V</td>
-                        <td className="mono">{pb.cellIds[c.index]?.parsed?.fixed?.productionDate || "--"}</td>
-                        {display.showCellSerialNumber && (
-                          <td><CopyableText value={pb.cellIds[c.index]?.raw || "--"} /></td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+        <div className="kpi-grid">
+          <div className="kpi-item">
+            <div className="kpi-label">{t("field_battery_level")}</div>
+            <div className="kpi-value">{pb.battery?.level ?? "--"}%</div>
           </div>
-        )}
+          <div className="kpi-item">
+            <div className="kpi-label">{t("field_battery_health")}</div>
+            <div className="kpi-value">{pb.battery?.health ?? "--"}%</div>
+          </div>
+          <div className="kpi-item">
+            <div className="kpi-label">{t("field_cycle_count")}</div>
+            <div className="kpi-value">{pb.battery?.cycleCount ?? "--"}</div>
+          </div>
+          <div className="kpi-item">
+            <div className="kpi-label">{t("section_temperature")}</div>
+            <div className="kpi-value">{pb.battery?.temperature ?? "--"} °C</div>
+          </div>
+        </div>
 
-        {activeTab === "history" && (
-          <div className="inner-panel">
-            {pb.history.length ? (
+        <div className="inner-group">
+          {displayCfg.showSerialNumber && (
+            <div className="kv-row">
+              <span className="kv-label">{t("field_device_sn")}</span>
+              <span className="kv-value mono">
+                <CopyableText value={pb.hello?.serialNumber} />
+              </span>
+            </div>
+          )}
+          <div className="kv-row">
+            <span className="kv-label">{t("field_total_voltage")}</span>
+            <span className="kv-value mono">
+              {pb.battery ? `${(pb.battery.voltage / 1000).toFixed(2)} V / ${pb.battery.current} mA` : "--"}
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-label">串并联拓扑</span>
+            <span className="kv-value">
+              {pb.battery ? `${pb.battery.series}S${pb.battery.parallel}P（共 ${pb.battery.cellCount} 节电芯）` : "--"}
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-label">{t("field_charge_state")}</span>
+            <span className="kv-value">{t(CHARGE_STATE_KEYS[pb.battery?.chargeState ?? 3])}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-label">{t("field_fault_status")}</span>
+            <span className="kv-value">
+              <span className={`pill ${pb.battery?.faultType ? "pill--red" : "pill--green"}`}>
+                {t(FAULT_KEYS[pb.battery?.faultType ?? 0] || "fault_normal")}
+              </span>
+            </span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-label">{t("section_temperature")}</span>
+            <span className="kv-value">
+              {tempRangeLabel}
+              {pb.tempModel?.batteryModel ? ` · ${pb.tempModel.batteryModel}` : ""}
+            </span>
+          </div>
+        </div>
+        <p className="card-subtitle" style={{ marginTop: 10 }}>
+          {t("field_temp_range_tip", { range: tempRangeLabel })}
+        </p>
+      </div>
+
+      {qi2Cfg && qi2Cfg.mode !== "none" && (
+        <Qi2Card
+          modelConfig={modelCfg}
+          qi2Status={pb.qi2Status}
+          busy={pb.qi2Busy}
+          stage={pb.qi2Stage}
+          error={pb.qi2Error}
+          onToggle={pb.toggleQi2}
+        />
+      )}
+
+      {LabSlot ? (
+        <LabSlot client={pb.client} currentCycles={pb.battery?.cycleCount} onApplied={pb.refresh} />
+      ) : null}
+
+      <div className="card">
+        <div className="card-head-row" style={{ marginBottom: 12 }}>
+          <div className="card-title-base">{t("section_cells")}</div>
+        </div>
+        <div className="cell-grid">
+          {pb.cells.map((cell) => {
+            const idInfo = pb.cellIds[cell.index];
+            const parsed = idInfo?.parsed;
+            return (
+              <div key={cell.index} className="cell-card">
+                <div className="cell-card__head">
+                  <strong>#{cell.index}</strong>
+                  <span className="mono">{(cell.voltage / 1000).toFixed(2)} V</span>
+                </div>
+                <div className="cell-metrics-3">
+                  <div>
+                    <div className="cell-m-label">电压</div>
+                    <div className="cell-m-val mono">{cell.voltage} mV</div>
+                  </div>
+                  <div>
+                    <div className="cell-m-label">电流</div>
+                    <div className="cell-m-val mono">{cell.current != null ? `${cell.current} mA` : "--"}</div>
+                  </div>
+                  <div>
+                    <div className="cell-m-label">温度</div>
+                    <div className="cell-m-val mono">{cell.hasTemperatureSensor ? `${cell.temperature} °C` : "--"}</div>
+                  </div>
+                </div>
+                {displayCfg.showCellSerialNumber && idInfo?.raw && (
+                  <div className="cell-meta">
+                    <div>
+                      <CopyableText value={idInfo.raw} className="mono" />
+                    </div>
+                    {parsed && (
+                      <div className="cell-meta__sub">
+                        {parsed.fixed.assemblyFactory} · {parsed.miCodeInfo.cellModel} · {parsed.fixed.batteryType} · {parsed.fixed.productionDate}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head-row" style={{ marginBottom: 12 }}>
+          <div className="card-title-base">{t("tab_history")}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="card-subtitle">
+              {pb.history.length} 条 · {safePage}/{totalHistoryPages}
+            </span>
+            {pb.history.length > 0 && (
+              <Link to="/exception-guide" className="ui-btn ui-btn--neutral ui-btn--sm">
+                异常说明
+              </Link>
+            )}
+          </div>
+        </div>
+        {pb.history.length === 0 ? (
+          <div className="card-subtitle">{t("history_empty")}</div>
+        ) : (
+          <>
+            <div style={{ overflowX: "auto" }}>
               <table className="mirror-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 220 }}>{t("col_history_time")}</th>
+                    <th>{t("col_history_time")}</th>
+                    <th>{t("col_history_state")}</th>
                     <th>{t("col_history_type")}</th>
-                    <th style={{ width: 140 }}>{t("col_history_value")}</th>
+                    <th>{t("col_cell")}</th>
+                    <th>{t("col_history_value")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pb.history.map((item, idx) => {
-                    const isTemp = item.errorType >= 3 && item.errorType <= 6;
-                    return (
-                      <tr key={idx}>
-                        <td className="mono">{formatLocalDateTime(item.timestamp)}</td>
-                        <td>
-                          <span className={`badge ${isTemp ? "badge--amber" : "badge--red"}`}>
-                            {t(FAULT_KEYS[item.errorType] || "fault_normal")}
-                          </span>
-                        </td>
-                        <td className="mono">{item.value}</td>
-                      </tr>
-                    );
-                  })}
+                  {pagedHistory.map((item, idx) => (
+                    <tr key={`${item.timestamp}-${idx}`}>
+                      <td className="mono">{formatLocalDateTime(item.timestamp)}</td>
+                      <td>{item.stateLabel || "--"}</td>
+                      <td>
+                        <span className={`pill ${item.errorType ? "pill--amber" : "pill--green"}`}>
+                          {item.nationalStandardFault || item.faultLabel || "--"}
+                        </span>
+                      </td>
+                      <td>#{item.cellIndex}</td>
+                      <td className="mono">{item.formattedValue ?? item.value}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-            ) : (
-              <div style={{ textAlign: "center", color: "var(--text-faint)", padding: "32px 0" }}>
-                {t("history_empty")}
+            </div>
+            {totalHistoryPages > 1 && (
+              <div className="pager-row">
+                <button
+                  type="button"
+                  className="ui-btn ui-btn--neutral ui-btn--sm"
+                  disabled={safePage <= 1}
+                  onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                >
+                  上一页
+                </button>
+                <button
+                  type="button"
+                  className="ui-btn ui-btn--neutral ui-btn--sm"
+                  disabled={safePage >= totalHistoryPages}
+                  onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                >
+                  下一页
+                </button>
               </div>
             )}
-          </div>
+          </>
         )}
-      </section>
-    </>
+      </div>
+    </div>
   );
 }

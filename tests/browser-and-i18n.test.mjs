@@ -22,7 +22,7 @@ test("Browser capability gate allows ALL WebHID-capable browsers (Chrome, Edge, 
 });
 
 test("Unified model config exposes display & capability switches for all 18 models", () => {
-  assert.equal(POWER_BANK_MODELS.length, 18);
+  assert.equal(POWER_BANK_MODELS.length, 24);
   const wpb1007 = resolveModelConfig(11);
   assert.equal(wpb1007.display.showSerialNumber, false);
   assert.equal(wpb1007.display.maxTemperatureSensors, 1);
