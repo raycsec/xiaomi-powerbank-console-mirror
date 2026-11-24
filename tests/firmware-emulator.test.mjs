@@ -156,7 +156,7 @@ test("[7] All 18 models & extreme hardware boundaries (WPB1007ZX, P25, -20C, -30
   const hello = await client.handshake();
   assert.equal(hello.modelConfig.isUnknown, true);
   assert.equal(hello.modelConfig.model, "ID_99");
-  assert.deepEqual(hello.modelConfig.capabilities.qi2.protocols, ["encrypted", "legacy"]);
+  assert.deepEqual(hello.modelConfig.capabilities.qi2.protocols, ["encrypted", "encrypted-compat", "legacy"]);
 
   const batt = await client.getBatteryInfo();
   assert.equal(batt.temperature, -20);

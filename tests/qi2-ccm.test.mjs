@@ -62,3 +62,41 @@ test("AES-128-CCM matches official wg for 24B WPB0525S SN, null-padded short SN,
   const outClean = await buildEncryptedQi2Payload({ snBytes: "DMPB0525S001", timestamp: 1760000000, health: 105, cycles: 12, enabled: true });
   assert.deepEqual(outNull, outClean);
 });
+
+test("aesCcm dual-backend parity: Node OpenSSL native CCM === WebCrypto RFC 3610 CCM", async () => {
+  const { nodeOpenSslAesCcmBackend, webCryptoAesCcmBackend, setAesCcmBackend } = await import("../src/protocol/aesCcm.js");
+  const snBytes = new TextEncoder().encode("84129/EZADJF6Y3000Q6");
+  const params = { snBytes, timestamp: 1795472615, health: 100, cycles: 0, enabled: true };
+
+  try {
+    setAesCcmBackend(nodeOpenSslAesCcmBackend);
+    const opensslOut = await buildEncryptedQi2Payload(params);
+
+    setAesCcmBackend(webCryptoAesCcmBackend);
+    const webcryptoOut = await buildEncryptedQi2Payload(params);
+
+    assert.deepEqual(webcryptoOut, opensslOut);
+
+    // Cross-backend seal -> open parity (0x44 device-to-host)
+    const key = new Uint8Array(16).fill(0x42);
+    const nonce = new Uint8Array([0x44, 0x6b, 0x04, 0xbc, 0xe7, 0, 0, 0, 0, 0xe6, 0, 0, 0]);
+    const pt = new Uint8Array([0x00, 0x64, 0x00, 0x02, 0x01]);
+    const sealedByOpenSsl = await nodeOpenSslAesCcmBackend.seal({ key, nonce, tagLength: 4 }, pt);
+    const openedByWebCrypto = await webCryptoAesCcmBackend.open({ key, nonce, tagLength: 4 }, sealedByOpenSsl);
+    assert.equal(openedByWebCrypto.ok, true);
+    assert.deepEqual(openedByWebCrypto.plaintext, pt);
+
+    const sealedByWebCrypto = await webCryptoAesCcmBackend.seal({ key, nonce, tagLength: 4 }, pt);
+    const openedByOpenSsl = await nodeOpenSslAesCcmBackend.open({ key, nonce, tagLength: 4 }, sealedByWebCrypto);
+    assert.equal(openedByOpenSsl.ok, true);
+    assert.deepEqual(openedByOpenSsl.plaintext, pt);
+
+    // Tampered tag rejected by both backends
+    const tampered = new Uint8Array(sealedByOpenSsl);
+    tampered[tampered.length - 1] ^= 0xff;
+    assert.equal((await nodeOpenSslAesCcmBackend.open({ key, nonce, tagLength: 4 }, tampered)).ok, false);
+    assert.equal((await webCryptoAesCcmBackend.open({ key, nonce, tagLength: 4 }, tampered)).ok, false);
+  } finally {
+    setAesCcmBackend(null);
+  }
+});

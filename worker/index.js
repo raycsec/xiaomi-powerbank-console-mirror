@@ -35,10 +35,6 @@ const MIME_MAP = {
 
 const ALLOWED_PAGE_ROUTES = new Set(["/", "/models", "/supportqi2", "/exception-guide"]);
 
-/**
- * @param {Headers} headers
- * @param {string|null} [nonce]
- */
 function applySecurityHeaders(headers, nonce = null) {
   headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   headers.set("X-Content-Type-Options", "nosniff");
@@ -62,10 +58,10 @@ export function injectGateAndNonce(html, scriptNonce) {
 
 export function extractPreloadLinks(html) {
   const links = [];
-  for (const m of html.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["'](\/eco--usb-device-web\/(?:static|lab)\/[^"']+)["']/gi)) {
+  for (const m of html.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["'](\/eco--usb-device-web\/static\/[^"']+)["']/gi)) {
     links.push(`<${m[1]}>; rel=preload; as=style`);
   }
-  for (const m of html.matchAll(/<script\b[^>]*type=["']module["'][^>]*src=["'](\/eco--usb-device-web\/(?:static|lab)\/[^"']+)["']/gi)) {
+  for (const m of html.matchAll(/<script\b[^>]*type=["']module["'][^>]*src=["'](\/eco--usb-device-web\/static\/[^"']+)["']/gi)) {
     links.push(`<${m[1]}>; rel=modulepreload`);
   }
   return links;
@@ -98,7 +94,7 @@ function getEdgeCache(env) {
 }
 
 async function serveStaticAsset(request, url, env, ctx) {
-  if (url.pathname.endsWith(".html")) {
+  if (url.pathname.endsWith(".html") || false) {
     return new Response("Not Found", { status: 404, headers: applySecurityHeaders(new Headers()) });
   }
 
@@ -164,7 +160,7 @@ export default {
       return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 301);
     }
 
-    const scriptNonce = crypto.randomUUID().replace(/-/g, "");
+        const scriptNonce = crypto.randomUUID().replace(/-/g, "");
     const authSecret = env.SECRET_KEY || "dev-secret-change-in-production";
     const agreeSecret = env.AGREE_SECRET_KEY || "dev-agree-secret-change-in-production";
     const isCN = request.cf?.country === "CN";
@@ -188,7 +184,7 @@ export default {
       return new Response('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"></svg>', { headers: h });
     }
 
-    if (url.pathname.startsWith("/eco--usb-device-web/")) {
+    if (url.pathname.startsWith("/eco--usb-device-web/") || false) {
       return serveStaticAsset(request, url, env, ctx);
     }
 

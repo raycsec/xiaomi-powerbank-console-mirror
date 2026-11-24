@@ -1,0 +1,353 @@
+import type {
+  BatteryIdInfo,
+  BatteryInfo,
+  CellStatus,
+  HandshakeResult,
+  HidLogDirection,
+  HidLogEntry,
+  HidTransport,
+  HistoryEntry,
+  Qi2ProtocolId,
+  Qi2SetResult,
+  Qi2Status,
+  TempModelInfo,
+} from "../types/domain.js";
+import type { Qi2ExecuteOptions } from "../protocol/qi2Strategies.js";
+import { CMD, RESP, TIMEOUT_MS } from "../protocol/constants.js";
+import {
+  decodeBatteryId,
+  decodeBatteryInfo,
+  decodeCellStatus,
+  decodeHelloResponse,
+  decodeHistoryBatch,
+  decodeQi2Status,
+  decodeQi2WriteResponse,
+  decodeTempModel,
+} from "../protocol/decoders.js";
+import { buildCommandFrame, buildHelloFrame, bytesToHex, extractFrames } from "../protocol/codec.js";
+import { QI2_STRATEGIES } from "../protocol/qi2Strategies.js";
+
+
+function decodeFrameForConsole(cmd: number, payload: Uint8Array): unknown {
+  try {
+    if (cmd === RESP.HELLO) {
+      const h = decodeHelloResponse(payload);
+      return { modelId: h.modelId, model: h.modelConfig?.model, snLen: h.snBytes.length, sn: h.serialNumber, chgState: h.chargeState };
+    }
+    if (cmd === RESP.BATTERY_INFO) return decodeBatteryInfo(payload);
+    if (cmd === RESP.CELL_STATUS) return decodeCellStatus(payload);
+    if (cmd === RESP.HISTORY) return decodeHistoryBatch(payload, 0);
+    if (cmd === RESP.BATTERY_ID) return decodeBatteryId(payload);
+    if (cmd === RESP.CELL_TEMP_MODEL) return decodeTempModel(payload);
+    if (cmd === RESP.QI2_STATUS) return decodeQi2Status(payload);
+    if (cmd === RESP.SET_QI2_LEGACY || cmd === RESP.SET_QI2_ENCRYPTED) return decodeQi2WriteResponse(payload);
+  } catch {}
+  return null;
+}
+
+export interface HidClientCallbacks {
+  onLog?: (entry: HidLogEntry) => void;
+  onDisconnect?: () => void;
+  consoleLog?: boolean;
+}
+
+interface PendingEntry {
+  expectedList: number[];
+  resolve: (payload: Uint8Array & { __command?: number }) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+export class HidClient {
+  transport: HidTransport;
+  callbacks: HidClientCallbacks;
+  onLog: ((entry: HidLogEntry) => void) | null;
+  consoleLog: boolean;
+  pending: Map<number, PendingEntry>;
+  inputBuffer: Uint8Array;
+  opened: boolean;
+  sessionVersion: number;
+  commandQueue: Promise<unknown>;
+  detachReport: (() => void) | null;
+  detachDisconnect: (() => void) | null;
+
+  constructor(transport: HidTransport, callbacks: HidClientCallbacks = {}) {
+    this.transport = transport;
+    this.callbacks = callbacks;
+    this.onLog = callbacks.onLog || null;
+    this.consoleLog = callbacks.consoleLog ?? (typeof window !== "undefined");
+    this.pending = new Map();
+    this.inputBuffer = new Uint8Array(0);
+    this.opened = false;
+    this.sessionVersion = 0;
+    this.commandQueue = Promise.resolve();
+    this.detachReport = null;
+    this.detachDisconnect = null;
+  }
+
+  async open(): Promise<void> {
+    await this.transport.open();
+    this.opened = true;
+    this.detachReport = this.transport.onInputReport((data) => this.handleInputReport(data));
+    this.detachDisconnect = this.transport.onDisconnect(() => this.handleUnexpectedDisconnect());
+    this.emitLog("INFO", "HID session opened", null, { ...this.transport.info });
+  }
+
+  async close(): Promise<void> {
+    this.sessionVersion += 1;
+    this.opened = false;
+    this.rejectAll(new Error("Session closed"));
+    this.detachReport?.();
+    this.detachDisconnect?.();
+    this.detachReport = null;
+    this.detachDisconnect = null;
+    this.inputBuffer = new Uint8Array(0);
+    await this.transport.close();
+  }
+
+  async disconnect(): Promise<void> {
+    if (!this.opened) return;
+    try {
+      const frame = buildCommandFrame(CMD.DISCONNECT);
+      this.emitLog("TX", "Disconnect", frame);
+      await this.transport.send(frame);
+    } catch {
+    }
+    await this.close();
+  }
+
+  async handshake(): Promise<HandshakeResult> {
+    const { frame, timestamp } = buildHelloFrame();
+    const payload = await this.enqueue(() =>
+      this.requestRawUnlocked(CMD.HELLO, [RESP.HELLO, RESP.ECHO], TIMEOUT_MS.HELLO, frame, "Hello"),
+    );
+    if (payload.__command === RESP.ECHO) {
+      return {
+        isEcho: true,
+        timestamp,
+        modelId: null,
+        snBytes: new Uint8Array(0),
+        serialNumber: "",
+        chargeState: 0,
+        modelConfig: null,
+      };
+    }
+    return { isEcho: false, timestamp, ...decodeHelloResponse(payload) };
+  }
+
+  async sendHeartbeat(): Promise<void> {
+    if (!this.opened) return;
+    const version = this.sessionVersion;
+    try {
+      const { frame } = buildHelloFrame();
+      await this.enqueue(() =>
+        this.requestRawUnlocked(CMD.HELLO, [RESP.HELLO, RESP.ECHO], TIMEOUT_MS.HELLO, frame, "Heartbeat"),
+      );
+    } catch (error) {
+      this.emitLog("ERROR", "Heartbeat failed", null, { message: error instanceof Error ? error.message : String(error) });
+      if (version === this.sessionVersion) {
+        this.handleUnexpectedDisconnect();
+      }
+    }
+  }
+
+  async getBatteryInfo(): Promise<BatteryInfo> {
+    const payload = await this.request(CMD.GET_BATTERY_INFO, RESP.BATTERY_INFO, TIMEOUT_MS.COMMAND);
+    return decodeBatteryInfo(payload);
+  }
+
+  async getCellStatus(cellCount: number): Promise<CellStatus[]> {
+    if (cellCount <= 0) return [];
+    const payload = await this.request(
+      CMD.GET_CELL_STATUS,
+      RESP.CELL_STATUS,
+      TIMEOUT_MS.COMMAND,
+      new Uint8Array([1, Math.min(255, cellCount)]),
+    );
+    return decodeCellStatus(payload);
+  }
+
+  async getBatteryId(cellIndex: number): Promise<BatteryIdInfo> {
+    const payload = await this.request(
+      CMD.GET_BATTERY_ID,
+      RESP.BATTERY_ID,
+      TIMEOUT_MS.BATTERY_ID,
+      new Uint8Array([cellIndex]),
+    );
+    return decodeBatteryId(payload);
+  }
+
+  async getTempModel(): Promise<TempModelInfo> {
+    const payload = await this.request(CMD.GET_CELL_TEMP_MODEL, RESP.CELL_TEMP_MODEL, TIMEOUT_MS.COMMAND);
+    return decodeTempModel(payload);
+  }
+
+  async getHistory(start: number, end: number, historyMinTimestamp = 0): Promise<HistoryEntry[]> {
+    const reqPayload = new Uint8Array([
+      start & 0xff,
+      (start >>> 8) & 0xff,
+      end & 0xff,
+      (end >>> 8) & 0xff,
+    ]);
+    const payload = await this.request(CMD.GET_HISTORY, RESP.HISTORY, TIMEOUT_MS.HISTORY, reqPayload);
+    return decodeHistoryBatch(payload, historyMinTimestamp);
+  }
+
+  async getQi2Status(): Promise<Qi2Status> {
+    const payload = await this.request(CMD.GET_QI2_STATUS, RESP.QI2_STATUS, TIMEOUT_MS.COMMAND);
+    return decodeQi2Status(payload);
+  }
+
+  async setQi2(
+    targetEnabled: boolean,
+    protocolChain: Qi2ProtocolId[] = ["encrypted", "encrypted-compat", "legacy"],
+    options: Qi2ExecuteOptions = {},
+  ): Promise<Qi2SetResult> {
+    if (!protocolChain.length) {
+      throw new Error("Qi2.2 toggle is not supported for this model");
+    }
+    return this.enqueue(async () => {
+      const errors: Array<{ protocol: Qi2ProtocolId; message: string }> = [];
+      for (let i = 0; i < protocolChain.length; i += 1) {
+        const strategyId = protocolChain[i];
+        const strategy = QI2_STRATEGIES[strategyId];
+        if (!strategy) continue;
+        try {
+          const result = await strategy.execute(this, targetEnabled, options);
+          return {
+            ...result,
+            usedFallback: i > 0,
+            errors,
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          errors.push({ protocol: strategyId, message });
+          this.emitLog("WARN", `Qi2.2 ${strategyId} strategy failed`, null, { message });
+          if (!this.opened) break;
+        }
+      }
+      const summary = errors.map((e) => `${e.protocol}: ${e.message}`).join(" | ");
+      throw new Error(summary || "All Qi2.2 protocols failed");
+    });
+  }
+
+  enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const version = this.sessionVersion;
+    const next = this.commandQueue.then(() => {
+      if (!this.opened || version !== this.sessionVersion) {
+        throw new Error("Device is not connected");
+      }
+      return operation();
+    });
+    this.commandQueue = next.catch(() => undefined);
+    return next;
+  }
+
+  request(command: number, expectedResp: number | number[], timeoutMs: number, payload: Uint8Array = new Uint8Array(0)): Promise<Uint8Array & { __command?: number }> {
+    const frame = buildCommandFrame(command, payload);
+    return this.enqueue(() => this.requestRawUnlocked(command, expectedResp, timeoutMs, frame));
+  }
+
+  requestUnlocked(command: number, expectedResp: number | number[], timeoutMs: number, payload: Uint8Array = new Uint8Array(0)): Promise<Uint8Array & { __command?: number }> {
+    return this.requestRawUnlocked(command, expectedResp, timeoutMs, buildCommandFrame(command, payload));
+  }
+
+  async requestRawUnlocked(command: number, expectedResp: number | number[], timeoutMs: number, frame: Uint8Array, label?: string): Promise<Uint8Array & { __command?: number }> {
+    if (!this.opened) throw new Error("Device is not connected");
+    const expectedList = Array.isArray(expectedResp) ? expectedResp : [expectedResp];
+
+    const responsePromise = new Promise<Uint8Array & { __command?: number }>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        for (const key of expectedList) this.pending.delete(key);
+        reject(new Error(`HID command 0x${command.toString(16).toUpperCase()} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      const entry: PendingEntry = { expectedList, resolve, reject, timer };
+      for (const key of expectedList) this.pending.set(key, entry);
+    });
+    void responsePromise.catch(() => undefined);
+
+    this.emitLog("TX", label || `0x${command.toString(16).toUpperCase().padStart(2, "0")}`, frame, {
+      cmd: `0x${command.toString(16).toUpperCase().padStart(2, "0")}`,
+      len: frame.length >= 4 ? frame[2] : 0,
+      frameLen: frame.length,
+    });
+    try {
+      await this.transport.send(frame);
+    } catch (error) {
+      const entry = this.pending.get(expectedList[0]);
+      if (entry) {
+        clearTimeout(entry.timer);
+        for (const key of entry.expectedList) this.pending.delete(key);
+        entry.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+      throw error;
+    }
+    return responsePromise;
+  }
+
+  handleInputReport(chunk: Uint8Array): void {
+    if (!this.opened) return;
+    const merged = new Uint8Array(this.inputBuffer.length + chunk.length);
+    merged.set(this.inputBuffer);
+    merged.set(chunk, this.inputBuffer.length);
+    const { frames, remaining } = extractFrames(merged);
+    this.inputBuffer = remaining.length > 1024 ? new Uint8Array(0) : remaining;
+
+    for (const frame of frames) {
+      this.emitLog(
+        "RX",
+        `0x${frame.command.toString(16).toUpperCase().padStart(2, "0")}`,
+        frame.raw,
+        {
+          cmd: `0x${frame.command.toString(16).toUpperCase().padStart(2, "0")}`,
+          len: frame.length,
+          crcOk: frame.crcValid,
+          decoded: decodeFrameForConsole(frame.command, frame.payload),
+        },
+      );
+
+      const waiter = this.pending.get(frame.command);
+      if (!waiter) continue;
+      clearTimeout(waiter.timer);
+      for (const key of waiter.expectedList) this.pending.delete(key);
+
+      if (!frame.crcValid) {
+        waiter.reject(new Error(`CRC-8 mismatch on 0x${frame.command.toString(16).toUpperCase()}`));
+      } else {
+        const result = frame.payload as Uint8Array & { __command?: number };
+        result.__command = frame.command;
+        waiter.resolve(result);
+      }
+    }
+  }
+
+  handleUnexpectedDisconnect(): void {
+    if (!this.opened) return;
+    this.opened = false;
+    this.sessionVersion += 1;
+    this.rejectAll(new Error("Device disconnected"));
+    this.callbacks.onDisconnect?.();
+  }
+
+  rejectAll(error: Error): void {
+    const visited = new Set();
+    for (const entry of this.pending.values()) {
+      if (visited.has(entry)) continue;
+      visited.add(entry);
+      clearTimeout(entry.timer);
+      entry.reject(error);
+    }
+    this.pending.clear();
+  }
+
+  emitLog(direction: HidLogDirection, label: string, bytes: Uint8Array | null, meta: Record<string, unknown> | null = null): void {
+    const hex = bytes ? bytesToHex(bytes, true) : "";
+    if (this.consoleLog && typeof console !== "undefined") {
+      const tag = direction === "TX" ? "[HID TX]" : direction === "RX" ? "[HID RX]" : `[HID ${direction}]`;
+      console.log(tag, meta ? { ...meta, raw: hex } : { label, raw: hex });
+    }
+    if (!this.onLog) return;
+    this.onLog({ at: new Date().toISOString(), direction, label, hex, ...(meta ? { meta } : {}) });
+  }
+}

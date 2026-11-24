@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { HidClient } from "../src/hid/HidClient.js";
 import { MockHidTransport } from "../src/hid/MockHidTransport.js";
-import { APP_VERSION, hashSerialHex, reportQi2Event } from "../src/services/qi2Telemetry.js";
+import { APP_VERSION, UI_BADGE_VERSION, hashSerialHex, reportQi2Event } from "../src/services/qi2Telemetry.js";
 
 test("[v32] WPB1025S (modelId=19) with all-0xFF non-printable SN falls back from 0x06 to 0xE6", async () => {
   const allFfSn = new Uint8Array(20).fill(0xff);
@@ -31,8 +31,9 @@ test("[v32] WPB1025S (modelId=19) with all-0xFF non-printable SN falls back from
   await client.close();
 });
 
-test("[v32] qi2Telemetry posts complete v32 payload with hashed raw snBytes and devLogs", async () => {
-  assert.equal(APP_VERSION, "v34");
+test("[v32] qi2Telemetry posts complete payload with APP_VERSION=v37, UI_BADGE_VERSION=v36, hashed raw snBytes and devLogs", async () => {
+  assert.equal(APP_VERSION, "v37");
+  assert.equal(UI_BADGE_VERSION, "v36");
   let captured = null;
   const mockFetch = async (url, init) => {
     captured = { url, body: JSON.parse(init.body) };
@@ -52,7 +53,7 @@ test("[v32] qi2Telemetry posts complete v32 payload with hashed raw snBytes and 
   });
   assert.equal(res.sent, true);
   assert.equal(captured.url, "/api/qi2-report");
-  assert.equal(captured.body.appVersion, "v34");
+  assert.equal(captured.body.appVersion, "v37");
   assert.equal(captured.body.snHash, await hashSerialHex(sn));
   assert.equal(captured.body.devLogs.length, 1);
 });
