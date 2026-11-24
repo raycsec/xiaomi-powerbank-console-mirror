@@ -1,7 +1,7 @@
 import type { HidLogEntry, Qi2Stats } from "../types/domain.js";
 
-export const APP_VERSION = "v37";
-export const UI_BADGE_VERSION = "v36";
+export const APP_VERSION = "v38";
+export const UI_BADGE_VERSION = "v38";
 
 export interface ReportQi2EventInput {
   model?: string;

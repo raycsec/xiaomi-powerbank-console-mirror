@@ -329,3 +329,75 @@ test("WPB0525S prioritizes encrypted-compat first (32B padded frames, 20B SN sli
   assert.equal(disableRes.status.enabled, false);
   await client.close();
 });
+
+test("encrypted-compat must send full 13B Hello so firmware latches session timestamp (not empty 0x00)", async () => {
+  const { buildCommandFrame } = await import("../src/protocol/codec.js");
+  const { buildEncryptedQi2Payload } = await import("../src/protocol/qi2Crypto.js");
+  let qi2Enabled = false;
+  let latchedTs = 0; // Only updated by full 13-byte Hello (not empty 0x00)!
+  const snBytes = new Uint8Array([
+    ...new TextEncoder().encode("84130/EZADJF6XM002WW"),
+    0x00, 0x00, 0x00, 0x00,
+  ]);
+  const handlers = new Set();
+  const mockTransport = {
+    kind: "demo",
+    info: { productName: "XiaomiPowerBank", vendorId: 0x2717, productId: 0x5116 },
+    async open() {},
+    async close() {},
+    onInputReport(fn) { handlers.add(fn); return () => handlers.delete(fn); },
+    onDisconnect() { return () => {}; },
+    async send(frame) {
+      const cmd = frame[1];
+      const payloadLen = frame[2];
+      const emit = (respCmd, payload) => {
+        const resp = buildCommandFrame(respCmd, payload);
+        for (const fn of handlers) fn(resp);
+      };
+      if (cmd === 0x00) {
+        if (payloadLen === 13) {
+          latchedTs = new DataView(frame.buffer, frame.byteOffset + 3, 4).getUint32(0, true);
+        }
+        const p = new Uint8Array(2 + snBytes.length + 1);
+        p[0] = 10; p[1] = 0; p.set(snBytes, 2); p[p.length - 1] = 1;
+        emit(0x10, p);
+      } else if (cmd === 0x07) {
+        emit(0x17, new Uint8Array([0, qi2Enabled ? 1 : 0]));
+      } else if (cmd === 0x01) {
+        const p = new Uint8Array(18);
+        p[0] = 0; p[1] = 1; p[2] = 2; p[3] = 0; p[4] = 100; p[5] = 0;
+        p[11] = 0x11; p[12] = 74; p[13] = 19; p[14] = 0x80; p[15] = 0x10;
+        emit(0x11, p);
+      } else if (cmd === 0xe6) {
+        if (frame.length !== 32 || latchedTs === 0) {
+          emit(0xf6, new Uint8Array([1]));
+          return;
+        }
+        const sent = frame.slice(3, 3 + payloadLen);
+        const expected = await buildEncryptedQi2Payload({
+          snBytes: snBytes.slice(0, 20),
+          timestamp: latchedTs,
+          health: 100,
+          cycles: 2,
+          enabled: true,
+          useRawSerialBytes: true,
+        });
+        const ok = sent.length === expected.length && sent.every((b, i) => b === expected[i]);
+        if (ok) {
+          qi2Enabled = true;
+          emit(0xf6, new Uint8Array([0]));
+        } else {
+          emit(0xf6, new Uint8Array([1]));
+        }
+      }
+    },
+  };
+
+  const client = new HidClient(mockTransport, { consoleLog: false });
+  await client.open();
+  const res = await client.setQi2(true, ["encrypted-compat"], { commandDelayMs: 0, readbackIntervalMs: 0 });
+  assert.equal(res.protocol, "encrypted-compat");
+  assert.equal(res.status.enabled, true);
+  assert.ok(latchedTs > 0);
+  await client.close();
+});

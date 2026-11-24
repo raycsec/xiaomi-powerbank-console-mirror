@@ -175,6 +175,7 @@ export default function SupportQi2Page() {
       ))}
 
       <div style={{ fontSize: 14, fontWeight: 700, margin: "18px 4px 10px" }}>{t("support_qi2_group_experimental")}</div>
+      <p style={{ margin: "0 4px 4px", fontSize: 12, color: "var(--amber-text)" }}>{t("support_qi2_experimental_note")}</p>
       {groups.experimental.map((m: PowerBankModelConfig, idx: number) => (
         <div key={m.model} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 22px", marginTop: idx ? 10 : 0 }}>
           <div>

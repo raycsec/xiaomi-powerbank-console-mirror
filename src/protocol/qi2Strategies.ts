@@ -101,43 +101,48 @@ async function performHelloHandshake(
   client: HidClient,
   padded32: boolean,
   label: string,
+  minTimestamp = 0,
 ): Promise<{ timestamp: number; modelId: number; snBytes: Uint8Array }> {
-  if (padded32) {
-    // 兼容第三方工具 helloGet(): 先发空载 0x00 32B 帧，超时/失败再发带 timestamp + "xiaomi-pb" 32B 帧
-    try {
-      const emptyFrame = buildPadded32CommandFrame(CMD.HELLO);
-      const emptyPayload = await client.requestRawUnlocked(
-        CMD.HELLO,
-        [RESP.HELLO, RESP.ECHO],
-        TIMEOUT_MS.HELLO,
-        emptyFrame,
-        `${label} (0x00 padded32)`,
-      );
-      if (emptyPayload.__command === RESP.HELLO && emptyPayload.length >= 23) {
-        const decoded = decodeHelloResponse(emptyPayload);
-        if (decoded.snBytes.length > 0) {
-          const timestamp = (Math.floor(Date.now() / 1000) + 8 * 3600) >>> 0;
-          return { timestamp, modelId: decoded.modelId, snBytes: decoded.snBytes };
-        }
-      }
-    } catch {
-      // Fall through to full Hello frame with timestamp + magic
-    }
-  }
+  const nowSec = (Math.floor(Date.now() / 1000) + 8 * 3600) >>> 0;
+  const targetSec = minTimestamp > nowSec ? minTimestamp : nowSec;
+  const targetMs = (targetSec - 8 * 3600) * 1000;
 
-  const { frame: helloFrame, timestamp } = padded32 ? buildPadded32HelloFrame() : buildHelloFrame();
-  const helloPayload = await client.requestRawUnlocked(
-    CMD.HELLO,
-    RESP.HELLO,
-    TIMEOUT_MS.HELLO,
-    helloFrame,
-    label,
-  );
-  const hello = decodeHelloResponse(helloPayload);
-  if (!hello.snBytes.length) {
-    throw new Error("Device serial bytes unavailable");
+  // 必须优先发送带 4B timestamp + "xiaomi-pb" 的完整 13B Hello，确保固件端真正锁存本次会话时间戳；
+  // 仅当完整 Hello 超时/失败时，才降级尝试空载荷 0x00 32B 帧。
+  try {
+    const { frame: helloFrame, timestamp } = padded32
+      ? buildPadded32HelloFrame(targetMs)
+      : buildHelloFrame(targetMs);
+    const helloPayload = await client.requestRawUnlocked(
+      CMD.HELLO,
+      RESP.HELLO,
+      TIMEOUT_MS.HELLO,
+      helloFrame,
+      label,
+    );
+    const hello = decodeHelloResponse(helloPayload);
+    if (!hello.snBytes.length) {
+      throw new Error("Device serial bytes unavailable");
+    }
+    return { timestamp, modelId: hello.modelId, snBytes: hello.snBytes };
+  } catch (fullHelloErr) {
+    if (!padded32) throw fullHelloErr;
+    const emptyFrame = buildPadded32CommandFrame(CMD.HELLO);
+    const emptyPayload = await client.requestRawUnlocked(
+      CMD.HELLO,
+      [RESP.HELLO, RESP.ECHO],
+      TIMEOUT_MS.HELLO,
+      emptyFrame,
+      `${label} (0x00 empty fallback)`,
+    );
+    if (emptyPayload.__command === RESP.HELLO && emptyPayload.length >= 23) {
+      const decoded = decodeHelloResponse(emptyPayload);
+      if (decoded.snBytes.length > 0) {
+        return { timestamp: targetSec, modelId: decoded.modelId, snBytes: decoded.snBytes };
+      }
+    }
+    throw fullHelloErr;
   }
-  return { timestamp, modelId: hello.modelId, snBytes: hello.snBytes };
 }
 
 interface EncryptedCandidate {
@@ -378,6 +383,7 @@ export const encryptedQi2Strategy: Qi2Strategy = {
           client,
           padded32,
           `Hello (Qi2.2 retry #${idx} ${cand.snMode} cycles=${cand.cycles})`,
+          (session.timestamp + 1) >>> 0,
         );
         client.emitLog?.("INFO", `Qi2.2 encrypted retry (${cand.protocol})`, null, {
           snMode: cand.snMode,
@@ -517,6 +523,7 @@ export const encryptedCompatQi2Strategy: Qi2Strategy = {
           client,
           true,
           `Hello (Qi2.2 compat retry #${idx} ${cand.snMode} cycles=${cand.cycles})`,
+          (session.timestamp + 1) >>> 0,
         );
         client.emitLog?.("INFO", `Qi2.2 encrypted-compat retry (${cand.protocol})`, null, {
           snMode: cand.snMode,
