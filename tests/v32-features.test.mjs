@@ -31,9 +31,9 @@ test("[v32] WPB1025S (modelId=19) with all-0xFF non-printable SN falls back from
   await client.close();
 });
 
-test("[v32] qi2Telemetry posts complete payload with APP_VERSION=v38, UI_BADGE_VERSION=v38, hashed raw snBytes and devLogs", async () => {
-  assert.equal(APP_VERSION, "v38");
-  assert.equal(UI_BADGE_VERSION, "v38");
+test("[v32] qi2Telemetry posts complete payload with APP_VERSION=v39, UI_BADGE_VERSION=v39, hashed raw snBytes and devLogs", async () => {
+  assert.equal(APP_VERSION, "v39");
+  assert.equal(UI_BADGE_VERSION, "v39");
   let captured = null;
   const mockFetch = async (url, init) => {
     captured = { url, body: JSON.parse(init.body) };
@@ -53,7 +53,7 @@ test("[v32] qi2Telemetry posts complete payload with APP_VERSION=v38, UI_BADGE_V
   });
   assert.equal(res.sent, true);
   assert.equal(captured.url, "/api/qi2-report");
-  assert.equal(captured.body.appVersion, "v38");
+  assert.equal(captured.body.appVersion, "v39");
   assert.equal(captured.body.snHash, await hashSerialHex(sn));
   assert.equal(captured.body.devLogs.length, 1);
 });

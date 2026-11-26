@@ -14,6 +14,12 @@ import { HidClient } from "../hid/HidClient.js";
 import { WebHidTransport } from "../hid/WebHidTransport.js";
 import { TIMEOUT_MS } from "../protocol/constants.js";
 import { reportQi2Event } from "../services/qi2Telemetry.js";
+import {
+  FALLBACK_WPB0525S_TEST_PACK,
+  isWpb0525sDevice,
+  MAIN_WPB0525S_PROTOCOL_VERSION,
+  runWpb0525sAlgorithmPack,
+} from "../services/wpb0525sPack.js";
 
 const AUTO_REFRESH_INTERVAL_MS = 3000;
 
@@ -228,23 +234,62 @@ export function usePowerBank() {
 
     try {
       setQi2Stage("writing");
-      const result = await client.setQi2(targetEnabled, qi2Cfg.protocols);
-      setQi2Stage("readback");
-      setQi2Status(result.status);
-      const detail = result.skipped
-        ? `${result.protocol}-skipped`
-        : result.usedFallback
-          ? `${result.protocol}-fallback`
-          : result.protocol;
-      void reportQi2Event({
-        model: hello?.modelConfig?.model,
-        snBytes: hello?.snBytes,
-        action: targetEnabled,
-        ok: true,
-        detail,
-        info: { ...baseInfo, protocol: result.protocol, writeStatus: result.writeStatus ?? 0, readbackTries: result.attempts, readback: result.status.enabled },
-        devLogs: logsRef.current.slice(flowStart),
-      });
+      if (isWpb0525sDevice(hello?.modelConfig?.model, hello?.modelId, FALLBACK_WPB0525S_TEST_PACK)) {
+        const summary = await runWpb0525sAlgorithmPack(client, {
+          targetEnabled,
+          pack: FALLBACK_WPB0525S_TEST_PACK,
+          stopOnSuccess: true,
+        });
+        setQi2Stage("readback");
+        const matched = summary.results.find((r) => r.ok);
+        if (matched) {
+          if (matched.status) setQi2Status(matched.status);
+          else setQi2Status({ success: true, statusCode: 0, enabled: targetEnabled });
+          const detail = matched.skipped
+            ? `${matched.algorithmId}-skipped`
+            : `aligned:${matched.algorithmId}`;
+          void reportQi2Event({
+            model: hello?.modelConfig?.model,
+            snBytes: hello?.snBytes,
+            action: targetEnabled,
+            ok: true,
+            detail,
+            info: {
+              ...baseInfo,
+              protocol: matched.algorithmId,
+              mainProtocolVersion: MAIN_WPB0525S_PROTOCOL_VERSION,
+              writeStatus: matched.writeStatus ?? 0,
+              readbackTries: matched.attempts,
+              readback: matched.status?.enabled ?? targetEnabled,
+              totalGroups: summary.totalGroups,
+            },
+            devLogs: logsRef.current.slice(flowStart),
+          });
+        } else {
+          const chain = summary.results
+            .map((r) => `${r.algorithmId}=${r.writeStatus ?? r.detail}`)
+            .join(", ");
+          throw new Error(`WPB0525S aligned protocols rejected (${summary.totalGroups} groups: ${chain})`);
+        }
+      } else {
+        const result = await client.setQi2(targetEnabled, qi2Cfg.protocols);
+        setQi2Stage("readback");
+        setQi2Status(result.status);
+        const detail = result.skipped
+          ? `${result.protocol}-skipped`
+          : result.usedFallback
+            ? `${result.protocol}-fallback`
+            : result.protocol;
+        void reportQi2Event({
+          model: hello?.modelConfig?.model,
+          snBytes: hello?.snBytes,
+          action: targetEnabled,
+          ok: true,
+          detail,
+          info: { ...baseInfo, protocol: result.protocol, writeStatus: result.writeStatus ?? 0, readbackTries: result.attempts, readback: result.status.enabled },
+          devLogs: logsRef.current.slice(flowStart),
+        });
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       setQi2Error(errMsg);
@@ -254,7 +299,12 @@ export function usePowerBank() {
         action: targetEnabled,
         ok: false,
         detail: errMsg,
-        info: baseInfo,
+        info: {
+          ...baseInfo,
+          ...(isWpb0525sDevice(hello?.modelConfig?.model, hello?.modelId, FALLBACK_WPB0525S_TEST_PACK)
+            ? { mainProtocolVersion: MAIN_WPB0525S_PROTOCOL_VERSION }
+            : {}),
+        },
         devLogs: logsRef.current.slice(flowStart),
       });
     } finally {

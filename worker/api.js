@@ -4,6 +4,8 @@ const usedJtiMemory = new Set();
 const cnTokenMemory = new Set();
 let tablesInitialized = false;
 
+export const WORKER_MAIN_0525S_PROTOCOL_VERSION = "0525s-proto-2026.11.27-r1";
+
 export function parseCookie(cookieHeader, name) {
   if (!cookieHeader) return null;
   for (const part of cookieHeader.split(";")) {
@@ -104,7 +106,7 @@ export async function handleQi2Stats(url, env, headers) {
   );
 }
 
-export async function handleQi2Report(request, env, authSecret, agreeSecret, headers) {
+export async function handleQi2Report(request, env, authSecret, agreeSecret, headers, options = {}) {
   const { authorized } = await isSessionAuthorized(request, env, authSecret, agreeSecret);
   if (!authorized && env.MIRROR_DEV_MODE !== "1") {
     return Response.json({ ok: false, error: "forbidden" }, { status: 403, headers });
@@ -116,8 +118,21 @@ export async function handleQi2Report(request, env, authSecret, agreeSecret, hea
   if (!/^[A-Z0-9_-]{1,40}$/.test(model) || !/^[a-f0-9]{16,64}$/.test(snHash)) {
     return Response.json({ ok: false, error: "invalid_payload" }, { status: 400, headers });
   }
+  const infoLimit = options.infoLimit ?? 4000;
+  const logsLimit = options.logsLimit ?? 60000;
+  const detailLimit = options.detailLimit ?? 400;
+  const versionLimit = options.versionLimit ?? 64;
+
   if (!env.DB) {
-    return Response.json({ ok: true, stored: false }, { headers });
+    return Response.json(
+      {
+        ok: true,
+        stored: false,
+        adaptive: Boolean(options.adaptive),
+        groupCount: Array.isArray(data.info?.groupResults) ? data.info.groupResults.length : null,
+      },
+      { headers },
+    );
   }
   const now = Date.now();
   await env.DB.prepare(
@@ -126,16 +141,52 @@ export async function handleQi2Report(request, env, authSecret, agreeSecret, hea
       "ON CONFLICT(model, sn_hash, action) DO UPDATE SET ok=?4, detail=?5, info=?6, dev_logs=?7, app_version=?8, reported_at=?9, updated_at=?11",
   )
     .bind(
-      model, snHash, action, data.ok ? 1 : 0,
-      String(data.detail || "").slice(0, 400),
-      JSON.stringify(data.info || {}).slice(0, 4000),
-      data.devLogs ? JSON.stringify(data.devLogs).slice(0, 60000) : "",
-      String(data.appVersion || "").slice(0, 40),
+      model,
+      snHash,
+      action,
+      data.ok ? 1 : 0,
+      String(data.detail || "").slice(0, detailLimit),
+      JSON.stringify(data.info || {}).slice(0, infoLimit),
+      data.devLogs ? JSON.stringify(data.devLogs).slice(0, logsLimit) : "",
+      String(data.appVersion || "").slice(0, versionLimit),
       String(data.reportedAt || new Date().toISOString()),
-      now, now,
+      now,
+      now,
     )
     .run();
-  return Response.json({ ok: true, stored: true }, { headers });
+  return Response.json(
+    {
+      ok: true,
+      stored: true,
+      adaptive: Boolean(options.adaptive),
+      groupCount: Array.isArray(data.info?.groupResults) ? data.info.groupResults.length : null,
+    },
+    { headers },
+  );
+}
+
+export function handleWpb0525sTestMeta(env, headers) {
+  return Response.json(
+    {
+      ok: true,
+      mergedWorker: true,
+      testSitePath: "/0525s-test",
+      packUrl: "/0525s-test-pack.js",
+      mainProtocolVersion: env.MAIN_0525S_PROTOCOL_VERSION || WORKER_MAIN_0525S_PROTOCOL_VERSION,
+      serverTime: new Date().toISOString(),
+    },
+    { headers },
+  );
+}
+
+export async function handleWpb0525sTestReport(request, env, authSecret, agreeSecret, headers) {
+  return handleQi2Report(request, env, authSecret, agreeSecret, headers, {
+    adaptive: true,
+    detailLimit: 800,
+    infoLimit: 32000,
+    logsLimit: 120000,
+    versionLimit: 64,
+  });
 }
 
 export async function handleReportFingerprint(request, authSecret, isCN, headers) {

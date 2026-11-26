@@ -7,6 +7,7 @@ import MirrorBanner from "./components/MirrorBanner.js";
 import ModelsPage from "./components/ModelsPage.js";
 import PageHeaderCard from "./components/PageHeaderCard.js";
 import SupportQi2Page from "./components/SupportQi2Page.js";
+import Wpb0525sTestPage from "./components/Wpb0525sTestPage.js";
 import { I18nProvider, useI18n } from "./context/I18nContext.js";
 import type { HidClient } from "./hid/HidClient.js";
 
@@ -18,6 +19,15 @@ export type LabSlotComponent = React.ComponentType<{
 
 function ShellRoutes({ labSlot }: { labSlot?: LabSlotComponent | null }) {
   const { t } = useI18n();
+  const testSiteElement = (
+    <BrowserGate>
+      <MirrorBanner />
+      <div className="mirror-app">
+        <Wpb0525sTestPage />
+      </div>
+    </BrowserGate>
+  );
+
   return (
     <Routes>
       <Route
@@ -59,6 +69,8 @@ function ShellRoutes({ labSlot }: { labSlot?: LabSlotComponent | null }) {
           </BrowserGate>
         }
       />
+      <Route path="/0525s-test" element={testSiteElement} />
+      <Route path="/0525s-test/" element={testSiteElement} />
       <Route path="/exception-guide" element={<ExceptionGuidePage />} />
     </Routes>
   );

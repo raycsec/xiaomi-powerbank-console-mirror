@@ -6,12 +6,15 @@ import {
   handleQi2Report,
   handleQi2Stats,
   handleReportFingerprint,
+  handleWpb0525sTestMeta,
+  handleWpb0525sTestReport,
   isSessionAuthorized,
 } from "./api.js";
 import { WEBHID_GATE_SCRIPT, renderConsentPage, renderErrorPage } from "./consentPage.js";
 import { signHmac } from "./crypto.js";
 
 const STATIC_INDEX_KEY = "eco--usb-device-web/static/index.html";
+const TEST_PACK_KEY = "eco--usb-device-web/static/0525s-test-pack.js";
 const INDEX_CACHE_TTL_MS = 60_000;
 
 const indexHtmlCache = new Map();
@@ -33,7 +36,14 @@ const MIME_MAP = {
   html: "text/html; charset=utf-8",
 };
 
-const ALLOWED_PAGE_ROUTES = new Set(["/", "/models", "/supportqi2", "/exception-guide"]);
+const ALLOWED_PAGE_ROUTES = new Set([
+  "/",
+  "/models",
+  "/supportqi2",
+  "/exception-guide",
+  "/0525s-test",
+  "/0525s-test/",
+]);
 
 function applySecurityHeaders(headers, nonce = null) {
   headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
@@ -93,9 +103,57 @@ function getEdgeCache(env) {
   return null;
 }
 
+async function serveTestPackJs(request, url, env) {
+  const noCacheHeaders = applySecurityHeaders(
+    new Headers({
+      "content-type": MIME_MAP.js,
+      "cache-control": "no-cache, must-revalidate",
+      vary: "Accept-Encoding",
+    }),
+  );
+
+  if (env.XIAOMI_MIRROR) {
+    const obj =
+      (await env.XIAOMI_MIRROR.get(TEST_PACK_KEY)) ||
+      (await env.XIAOMI_MIRROR.get("0525s-test-pack.js"));
+    if (obj) {
+      const etag = obj.httpEtag || (obj.etag ? `"${obj.etag}"` : undefined);
+      if (etag) {
+        if (request.headers.get("if-none-match") === etag) {
+          noCacheHeaders.set("etag", etag);
+          return new Response(null, { status: 304, headers: noCacheHeaders });
+        }
+        noCacheHeaders.set("etag", etag);
+      }
+      return new Response(request.method === "HEAD" ? null : obj.body, {
+        status: 200,
+        headers: noCacheHeaders,
+      });
+    }
+  }
+
+  if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
+    const candidates = [new URL(`/${TEST_PACK_KEY}`, url), new URL("/0525s-test-pack.js", url)];
+    for (const candidate of candidates) {
+      const assetRes = await env.ASSETS.fetch(new Request(candidate, { method: request.method }));
+      if (assetRes.ok) {
+        return new Response(request.method === "HEAD" ? null : assetRes.body, {
+          status: 200,
+          headers: noCacheHeaders,
+        });
+      }
+    }
+  }
+
+  return new Response("Not Found", { status: 404, headers: applySecurityHeaders(new Headers()) });
+}
+
 async function serveStaticAsset(request, url, env, ctx) {
   if (url.pathname.endsWith(".html") || false) {
     return new Response("Not Found", { status: 404, headers: applySecurityHeaders(new Headers()) });
+  }
+  if (url.pathname === `/${TEST_PACK_KEY}`) {
+    return serveTestPackJs(request, url, env);
   }
 
   const edgeCache = getEdgeCache(env);
@@ -175,6 +233,10 @@ export default {
       else await initTask;
     }
 
+    if (url.pathname === "/0525s-test-pack.js") {
+      return serveTestPackJs(request, url, env);
+    }
+
     if (url.pathname === "/eco--usb-device-web/static/xiaomi.svg") {
       const h = applySecurityHeaders(new Headers({
         "content-type": "image/svg+xml",
@@ -200,6 +262,12 @@ export default {
     }
     if (request.method === "POST" && url.pathname === "/api/qi2-report") {
       return handleQi2Report(request, env, authSecret, agreeSecret, jsonHeaders);
+    }
+    if (request.method === "GET" && url.pathname === "/api/0525s-test/meta") {
+      return handleWpb0525sTestMeta(env, jsonHeaders);
+    }
+    if (request.method === "POST" && url.pathname === "/api/0525s-test/report") {
+      return handleWpb0525sTestReport(request, env, authSecret, agreeSecret, jsonHeaders);
     }
     if (request.method === "POST" && url.pathname === "/api/report-fingerprint") {
       return handleReportFingerprint(request, authSecret, isCN, jsonHeaders);
@@ -265,12 +333,10 @@ export default {
     }
 
     if (devMode) {
-      const entry = "/src/main.jsx";
-      const devHtml = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>小米移动电源详情</title></head><body><div id="root"></div><script type="module" src="${entry}"></script></body></html>`;
+      const entry = "/src/main.tsx";
+      const devHtml = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>小米移动电源详情</title><script src="/0525s-test-pack.js" data-wpb0525s-pack="1"></script></head><body><div id="root"></div><script type="module" src="${entry}"></script></body></html>`;
       return new Response(injectGateAndNonce(devHtml, scriptNonce), { status: 200, headers: h });
-    }
-
-    const expectedKey = STATIC_INDEX_KEY;
+    }    const expectedKey = STATIC_INDEX_KEY;
     return new Response(
       `Frontend build not found in R2 (${expectedKey}).`,
       { status: 503, headers: applySecurityHeaders(new Headers({ "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" })) },
