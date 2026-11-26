@@ -185,7 +185,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 export const FALLBACK_WPB0525S_TEST_PACK: Wpb0525sTestPack = {
-  testSiteVersion: "v38-0525s-test.1",
+  testSiteVersion: "v39-0525s-test.1",
   protocolVersion: MAIN_WPB0525S_PROTOCOL_VERSION,
   testSitePath: WPB0525S_TEST_SITE_PATH,
   targetModels: ["WPB0525S"],
@@ -480,7 +480,7 @@ export function evaluateWpb0525sProtocolParity(
     shouldShowTestSitePrompt: !matched,
     mainProtocolVersion: mainProto,
     testProtocolVersion,
-    testSiteVersion: String(pack.testSiteVersion || "v38-0525s-test"),
+    testSiteVersion: String(pack.testSiteVersion || "v39-0525s-test"),
     testSitePath: String(pack.testSitePath || WPB0525S_TEST_SITE_PATH),
     notice: {
       title: pack.mainSiteNotice?.title || FALLBACK_WPB0525S_TEST_PACK.mainSiteNotice.title,
